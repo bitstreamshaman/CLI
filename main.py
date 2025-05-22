@@ -6,7 +6,7 @@ import os
 
 #System
 from rich.console import Console
-from rich import print as console_print 
+from rich import print as print_console
 
 console = Console()
 
@@ -87,6 +87,8 @@ def chat(agent: Agent):
             
             print("\n")
             response = agent(user_input)
+
+            console_print()
 
         except KeyboardInterrupt:
             break
