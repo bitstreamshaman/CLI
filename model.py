@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 from os import getenv
 from rich.panel import Panel
-from rich import console, print as print_console
+from rich import print as print_console
 from strands.models.anthropic import AnthropicModel
 
 def get_model():

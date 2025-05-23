@@ -1,10 +1,16 @@
+
+#System
 from strands import Agent
-import use_gcp  
-from strands_tools import use_aws
 from model import get_model
 import os 
 
-#System
+#Cloud Providers
+from use_gcp import use_gcp
+from use_azure import use_azure
+from strands_tools import use_aws
+
+
+#Console output
 from rich.console import Console
 from rich import print as console_print 
 
@@ -74,8 +80,13 @@ def chat(agent: Agent):
             break
         
 if __name__ == "__main__":
+    
     orchestrator_agent = Agent(
-        tools=[use_gcp, use_aws],
+        tools=[
+            use_gcp, 
+            use_aws,
+            use_azure
+               ],
         model=get_model(),
         system_prompt=SYSTEM_PROMPT
     )
@@ -97,4 +108,5 @@ if __name__ == "__main__":
     print("💡 Commands: Type 'exit' to quit, 'clear' to clear screen, or ask me anything!")
     print("-"*60)
     
+    # Start the chat loop
     chat(orchestrator_agent)
