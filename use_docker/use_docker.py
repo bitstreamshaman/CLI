@@ -1,140 +1,290 @@
-#!/usr/bin/env python3
-"""
-Script to discover available tools in the Docker MCP Server.
-Run this while the Docker MCP server is running or let it start automatically.
-
-Usage:
-1. Make sure docker-mcp is available via uvx: uvx docker-mcp
-2. Run: python discover_docker_mcp_tools.py
-"""
-
+# docker_tools.py
+from strands import Agent, tool
 from mcp import stdio_client, StdioServerParameters
 from strands.tools.mcp import MCPClient
+from strands_tools import shell
+import json
+import uuid
+from model import get_model
 
-def discover_docker_mcp_tools():
-    """Discover and list all available tools from the Docker MCP server."""
-    
-    print("🔍 Discovering Docker MCP Server tools...")
-    print("=" * 60)
-    
-    try:
-        # Create MCP client connection
-        print("📡 Connecting to Docker MCP server...")
-        mcp_client = MCPClient(lambda: stdio_client(
+# Storage for our MCP client to maintain connection
+_mcp_client = None
+
+def _get_mcp_client():
+    """Get or create the MCP client connection."""
+    global _mcp_client
+    if _mcp_client is None:
+        _mcp_client = MCPClient(lambda: stdio_client(
             StdioServerParameters(command="uvx", args=["docker-mcp"])
         ))
-        
-        with mcp_client:
-            print("✅ Connected successfully!")
-            print()
-            
-            # List all available tools
-            print("📋 Listing available tools...")
-            tools = mcp_client.list_tools_sync()
-            
-            if not tools:
-                print("❌ No tools found!")
-                return
-            
-            print(f"✅ Found {len(tools)} tools:")
-            print()
-            
-            # Display tools in a nice format
-            for i, tool in enumerate(tools, 1):
-                print(f"{i:2d}. Tool Name: '{tool.tool_name}'")
-                if hasattr(tool, 'tool_spec') and tool.tool_spec:
-                    spec = tool.tool_spec
-                    if hasattr(spec, 'description') and spec.description:
-                        print(f"    Description: {spec.description}")
-                    if hasattr(spec, 'inputSchema') and spec.inputSchema:
-                        schema = spec.inputSchema
-                        if hasattr(schema, 'properties') and schema.properties:
-                            props = list(schema.properties.keys())
-                            print(f"    Parameters: {', '.join(props) if props else 'None'}")
-                print()
-            
-            # Also print tool names in a simple list
-            print("=" * 60)
-            print("📄 All tool names:")
-            for tool in tools:
-                print(f"  - {tool.tool_name}")
-            print("=" * 60)
-            
-            # Create a mapping for Docker tools
-            print("🔧 Tool name mapping for your code:")
-            print("DOCKER_TOOL_NAME_MAPPING = {")
-            for tool in tools:
-                tool_name = tool.tool_name
-                if 'ps' in tool_name.lower() or 'list' in tool_name.lower() and 'container' in tool_name.lower():
-                    print(f"    'list_containers': '{tool_name}',")
-                elif 'exec' in tool_name.lower():
-                    print(f"    'execute_command': '{tool_name}',")
-                elif 'logs' in tool_name.lower():
-                    print(f"    'get_logs': '{tool_name}',")
-                elif 'images' in tool_name.lower() or 'image' in tool_name.lower() and 'list' in tool_name.lower():
-                    print(f"    'list_images': '{tool_name}',")
-                elif 'inspect' in tool_name.lower():
-                    print(f"    'inspect_container': '{tool_name}',")
-                elif 'start' in tool_name.lower():
-                    print(f"    'start_container': '{tool_name}',")
-                elif 'stop' in tool_name.lower():
-                    print(f"    'stop_container': '{tool_name}',")
-                elif 'restart' in tool_name.lower():
-                    print(f"    'restart_container': '{tool_name}',")
-                elif 'remove' in tool_name.lower() or 'rm' in tool_name.lower():
-                    print(f"    'remove_container': '{tool_name}',")
-                elif 'pull' in tool_name.lower():
-                    print(f"    'pull_image': '{tool_name}',")
-                elif 'build' in tool_name.lower():
-                    print(f"    'build_image': '{tool_name}',")
-                elif 'run' in tool_name.lower():
-                    print(f"    'run_container': '{tool_name}',")
-                elif 'stats' in tool_name.lower():
-                    print(f"    'container_stats': '{tool_name}',")
-                elif 'network' in tool_name.lower():
-                    print(f"    'list_networks': '{tool_name}',")
-                elif 'volume' in tool_name.lower():
-                    print(f"    'list_volumes': '{tool_name}',")
-                else:
-                    # Generic mapping for unrecognized tools
-                    clean_name = tool_name.replace('-', '_').replace(' ', '_').lower()
-                    print(f"    '{clean_name}': '{tool_name}',")
-            print("}")
-            print("=" * 60)
-            
-            # Show detailed parameter information
-            print("🔍 Detailed tool specifications:")
-            for tool in tools:
-                print(f"\nTool: {tool.tool_name}")
-                if hasattr(tool, 'tool_spec') and tool.tool_spec:
-                    spec = tool.tool_spec
-                    if hasattr(spec, 'inputSchema') and spec.inputSchema:
-                        schema = spec.inputSchema
-                        if hasattr(schema, 'properties') and schema.properties:
-                            print("  Parameters:")
-                            for param_name, param_info in schema.properties.items():
-                                param_type = param_info.get('type', 'unknown')
-                                param_desc = param_info.get('description', 'No description')
-                                required = param_name in schema.get('required', [])
-                                req_marker = " (required)" if required else " (optional)"
-                                print(f"    - {param_name} ({param_type}){req_marker}: {param_desc}")
-            print("=" * 60)
-            
-    except FileNotFoundError:
-        print("❌ Error: uvx or docker-mcp command not found.")
-        print("Make sure uvx is installed and docker-mcp is available.")
-        print("Install uvx with: pip install uv")
-        print("Then run: uvx docker-mcp (to test if it works)")
-        
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        import traceback
-        traceback.print_exc()
-        print("\n💡 Troubleshooting tips:")
-        print("1. Make sure Docker is running")
-        print("2. Ensure uvx is installed: pip install uv")
-        print("3. Test docker-mcp availability: uvx docker-mcp")
-        print("4. Check that docker-mcp can connect to Docker daemon")
+        _mcp_client.__enter__()
+    return _mcp_client
 
-if __name__ == "__main__":
-    discover_docker_mcp_tools()
+def _call_docker_tool(name, **kwargs):
+    """Call a Docker MCP tool with the given arguments."""
+    mcp_client = _get_mcp_client()
+    tool_use_id = f"docker-{name}-{uuid.uuid4()}"
+    
+    # Make sure the name doesn't have angle brackets
+    clean_name = name.strip('<>') if name.startswith('<') and name.endswith('>') else name
+    
+    # Call the tool
+    result = mcp_client.call_tool_sync(
+        tool_use_id=tool_use_id,
+        name=clean_name,  # Use the clean name
+        arguments=kwargs
+    )
+    
+    # Process the result
+    if result and result.get("status") == "success" and result.get("content"):
+        # Extract the content
+        for item in result.get("content", []):
+            if "text" in item:
+                try:
+                    # Try to parse as JSON
+                    return json.loads(item["text"])
+                except json.JSONDecodeError:
+                    # Return as text if not JSON
+                    return item["text"]
+    
+    # If we got here, something went wrong
+    return {"error": f"Error executing tool {name}", "result": result}
+
+@tool
+def list_docker_containers(all: bool = True) -> dict:
+    """
+    List all Docker containers using the Docker MCP server.
+    
+    This tool retrieves information about Docker containers running on the system.
+    
+    Args:
+        all: Optional. Whether to list all containers (including stopped ones).
+             Default is True. Set to False to list only running containers.
+    
+    Returns:
+        A dictionary containing the list of containers with their details.
+    """
+    args = {"all": all}
+    return _call_docker_tool("list-containers", **args)
+
+@tool
+def create_docker_container(image: str, name: str = None, ports: dict = None, 
+                          volumes: dict = None, environment: dict = None, 
+                          command: str = None) -> dict:
+    """
+    Create a new Docker container using the Docker MCP server.
+    
+    This tool creates a new Docker container with the specified configuration.
+    
+    Args:
+        image: The Docker image to use for the container.
+               Example: "nginx:latest"
+        name: Optional. Name for the container.
+              Example: "my-web-server"
+        ports: Optional. Port mappings as a dictionary.
+               Example: {"80": "8080"} maps container port 80 to host port 8080
+        volumes: Optional. Volume mounts as a dictionary.
+                Example: {"/host/path": "/container/path"}
+        environment: Optional. Environment variables as a dictionary.
+                    Example: {"ENV_VAR": "value"}
+        command: Optional. Command to run in the container.
+                Example: "/bin/bash"
+    
+    Returns:
+        A dictionary containing the container creation result.
+    """
+    args = {"image": image}
+    
+    if name:
+        args["name"] = name
+    if ports:
+        args["ports"] = ports
+    if volumes:
+        args["volumes"] = volumes
+    if environment:
+        args["environment"] = environment
+    if command:
+        args["command"] = command
+    
+    return _call_docker_tool("create-container", **args)
+
+@tool
+def get_docker_logs(container: str, lines: int = 100, follow: bool = False) -> dict:
+    """
+    Get logs from a Docker container using the Docker MCP server.
+    
+    This tool retrieves log output from the specified Docker container.
+    
+    Args:
+        container: The container name or ID to get logs from.
+                  Example: "my-web-server" or "a1b2c3d4e5f6"
+        lines: Optional. Number of log lines to retrieve. Default is 100.
+        follow: Optional. Whether to follow log output (stream). Default is False.
+    
+    Returns:
+        A dictionary containing the container logs.
+    """
+    args = {
+        "container": container,
+        "lines": lines,
+        "follow": follow
+    }
+    
+    return _call_docker_tool("get-logs", **args)
+
+@tool
+def deploy_docker_compose(compose_file: str = "docker-compose.yml", 
+                         project_name: str = None, detach: bool = True) -> dict:
+    """
+    Deploy a Docker Compose application using the Docker MCP server.
+    
+    This tool deploys services defined in a Docker Compose file.
+    
+    Args:
+        compose_file: Optional. Path to the Docker Compose file.
+                     Default is "docker-compose.yml"
+        project_name: Optional. Name for the Docker Compose project.
+                     If not provided, uses the directory name.
+        detach: Optional. Whether to run in detached mode. Default is True.
+    
+    Returns:
+        A dictionary containing the deployment result.
+    """
+    args = {
+        "compose_file": compose_file,
+        "detach": detach
+    }
+    
+    if project_name:
+        args["project_name"] = project_name
+    
+    return _call_docker_tool("deploy-compose", **args)
+
+@tool
+def use_docker(prompt: str):
+    """
+    Tool Usage: Comprehensive Docker operations using specialized MCP tools and Docker CLI commands.
+    
+    This tool provides access to Docker operations through a combination of specialized MCP tools
+    and Docker CLI commands via the shell tool. For any operations not covered by the MCP tools,
+    it defaults to using Docker CLI commands.
+    """
+    
+    system_prompt = """
+    You are a helpful Docker operations assistant with access to specialized Docker MCP tools and Docker CLI commands.
+    
+    AVAILABLE SPECIALIZED MCP TOOLS (use these when applicable):
+    - list_docker_containers: List all Docker containers (running and stopped)
+    - create_docker_container: Create a new Docker container with specified configuration
+    - get_docker_logs: Get logs from a specific container
+    - deploy_docker_compose: Deploy services using Docker Compose
+    
+    EXECUTION STRATEGY:
+    1. First, check if the requested operation can be handled by one of the specialized MCP tools above
+    2. If not, use Docker CLI commands through the shell tool
+    3. Always use the most appropriate tool for the task
+    
+    COMMAND PREVIEW REQUIREMENT (CRITICAL):
+    - Before executing ANY shell command, you MUST explicitly state: "I will execute the following command: `command_here`"
+    - This applies to ALL docker commands and shell operations
+    - Format example: "I will execute the following command: `docker ps -a --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'`"
+    
+    COMPREHENSIVE DOCKER CLI COMMAND PATTERNS:
+    
+    CONTAINER MANAGEMENT:
+    * List all containers: `docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"`
+    * List running containers: `docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"`
+    * Start container: `docker start CONTAINER_NAME`
+    * Stop container: `docker stop CONTAINER_NAME`
+    * Restart container: `docker restart CONTAINER_NAME`
+    * Remove container: `docker rm CONTAINER_NAME`
+    * Execute command in container: `docker exec -it CONTAINER_NAME COMMAND`
+    * Inspect container: `docker inspect CONTAINER_NAME`
+    * Container stats: `docker stats CONTAINER_NAME --no-stream`
+    * Copy files: `docker cp SOURCE CONTAINER:DEST` or `docker cp CONTAINER:SOURCE DEST`
+    
+    IMAGE MANAGEMENT:
+    * List images: `docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"`
+    * Pull image: `docker pull IMAGE_NAME:TAG`
+    * Build image: `docker build -t IMAGE_NAME:TAG PATH`
+    * Remove image: `docker rmi IMAGE_NAME:TAG`
+    * Image history: `docker history IMAGE_NAME`
+    * Inspect image: `docker inspect IMAGE_NAME`
+    * Tag image: `docker tag SOURCE_IMAGE:TAG TARGET_IMAGE:TAG`
+    
+    NETWORK MANAGEMENT:
+    * List networks: `docker network ls`
+    * Create network: `docker network create NETWORK_NAME`
+    * Connect container to network: `docker network connect NETWORK_NAME CONTAINER_NAME`
+    * Disconnect container: `docker network disconnect NETWORK_NAME CONTAINER_NAME`
+    * Inspect network: `docker network inspect NETWORK_NAME`
+    * Remove network: `docker network rm NETWORK_NAME`
+    
+    VOLUME MANAGEMENT:
+    * List volumes: `docker volume ls`
+    * Create volume: `docker volume create VOLUME_NAME`
+    * Inspect volume: `docker volume inspect VOLUME_NAME`
+    * Remove volume: `docker volume rm VOLUME_NAME`
+    * Prune unused volumes: `docker volume prune`
+    
+    DOCKER COMPOSE:
+    * Start services: `docker-compose up -d`
+    * Stop services: `docker-compose down`
+    * View logs: `docker-compose logs SERVICE_NAME`
+    * Scale service: `docker-compose up --scale SERVICE_NAME=3`
+    * List services: `docker-compose ps`
+    * Execute in service: `docker-compose exec SERVICE_NAME COMMAND`
+    
+    SYSTEM & CLEANUP:
+    * System info: `docker system info`
+    * Disk usage: `docker system df`
+    * System prune: `docker system prune`
+    * Remove unused containers: `docker container prune`
+    * Remove unused images: `docker image prune`
+    
+    LOGS & MONITORING:
+    * Container logs: `docker logs CONTAINER_NAME --tail 100`
+    * Follow logs: `docker logs -f CONTAINER_NAME`
+    * System events: `docker events --since '1h'`
+    
+    BEST PRACTICES FOR SHELL COMMANDS:
+    - Use --format for better readable output when available
+    - Include relevant columns in table format for better information display
+    - Use appropriate flags like -a for all, -q for quiet output
+    - Always specify container/image names clearly
+    - Use --tail for log commands to limit output
+    
+    WORKFLOW:
+    1. Analyze the user's request
+    2. Determine if a specialized MCP tool can handle it
+    3. If yes, use the MCP tool
+    4. If no, state the Docker command you will execute: "I will execute the following command: `command`"
+    5. Execute the Docker CLI command via shell tool
+    6. Present the results clearly to the user
+    
+    CONTAINER CREATION EXAMPLES:
+    - Simple web server: `docker run -d --name web-server -p 8080:80 nginx:latest`
+    - Database with volume: `docker run -d --name mysql-db -e MYSQL_ROOT_PASSWORD=password -v mysql-data:/var/lib/mysql mysql:8.0`
+    - Interactive container: `docker run -it --name ubuntu-container ubuntu:latest /bin/bash`
+    
+    TROUBLESHOOTING:
+    - Check if Docker daemon is running
+    - Verify container/image names are correct
+    - Check port conflicts for new containers
+    - Ensure sufficient disk space for operations
+    - Check network connectivity for image pulls
+    """
+    
+    agent = Agent(
+        model=get_model(),
+        system_prompt=system_prompt,
+        tools=[
+            list_docker_containers,
+            create_docker_container,
+            get_docker_logs,
+            deploy_docker_compose,
+            shell,
+        ])
+
+    result = agent(prompt)
+    return result
