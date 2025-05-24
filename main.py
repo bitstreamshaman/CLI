@@ -9,6 +9,8 @@ from use_gcp import use_gcp
 from use_azure import use_azure
 from strands_tools import use_aws
 
+#Utils
+
 
 #Console output
 from rich.console import Console
@@ -46,8 +48,10 @@ You help users create,manage and operate their cloud infrastructure across Googl
 - "Show me my AWS EC2 instances in us-east-1"
 - "Check my cloud billing costs for this month"
 - "Create a new subnet in GCP"
+- "List all my Azure resource groups"
 - "Set up monitoring for my AWS Lambda functions"
 - "Compare costs between my GCP and AWS usage"
+- "Deploy a new Kubernetes cluster in Azure"
 - "Help me troubleshoot connectivity issues"
 
 Ready to help you manage your cloud infrastructure efficiently and effectively!
