@@ -1,18 +1,17 @@
+#!/usr/bin/env python3
 
-#System
+# System and external dependencies
 from strands import Agent
-from model import get_model
-import os 
-
-#Cloud Providers
-from use_gcp import use_gcp
-from use_azure import use_azure
 from strands_tools import use_aws
+import os
 
-#Utils
-from use_docker import use_docker
+# Internal modules (relative imports)
+from .model import get_model
+from .use_gcp import use_gcp
+from .use_azure import use_azure
+from .use_docker import use_docker
 
-#Console output
+# Console output
 from rich.console import Console
 from rich import print as console_print 
 
@@ -58,32 +57,29 @@ Ready to help you manage your cloud infrastructure efficiently and effectively!
 """
 
 def chat(agent: Agent):
-    
     while True:
         try:
             user_input = input("\n\n|>| ")
 
-            
             if user_input.lower().strip() == "exit":
                 print("Bye!")
                 break
             elif user_input.lower().strip() == "clear":
                 os.system('cls' if os.name == 'nt' else 'clear')
                 continue
-
             elif user_input == "":
                 print("DEBUG: Empty input, skipping")
                 continue
             
             print("\n")
             response = agent(user_input)
-
             console_print()
 
         except KeyboardInterrupt:
             break
-        
-if __name__ == "__main__":
+
+def main():
+    """Main entry point for the CLI application."""
     
     orchestrator_agent = Agent(
         tools=[
@@ -91,7 +87,7 @@ if __name__ == "__main__":
             use_aws,
             use_azure,
             use_docker,
-               ],
+        ],
         model=get_model(),
         system_prompt=SYSTEM_PROMPT
     )
@@ -115,3 +111,6 @@ if __name__ == "__main__":
     
     # Start the chat loop
     chat(orchestrator_agent)
+
+if __name__ == "__main__":
+    main()
