@@ -6,7 +6,7 @@ from strands import tool
 from ..utils import _call_gcp_tool
 
 @tool
-def get_gcp_billing_info(project_id: str = None) -> dict:
+def gcp_get_billing_info(project_id: str = None) -> dict:
     """
     Get billing information for a Google Cloud Platform project.
     

@@ -2,11 +2,6 @@
 Main GCP operations tool using dynamic tool discovery and MCP integration.
 """
 
-import sys
-import os
-# Add the parent directory to Python path for model import
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-
 from strands import Agent, tool
 from strands_tools import shell
 from model import get_model

@@ -5,7 +5,12 @@ from strands.tools.mcp import MCPClient
 from strands_tools import shell
 import json
 import uuid
+import logging
 from model import get_model
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Storage for our MCP client to maintain connection
 _mcp_client = None
@@ -14,41 +19,68 @@ def _get_mcp_client():
     """Get or create the MCP client connection."""
     global _mcp_client
     if _mcp_client is None:
-        _mcp_client = MCPClient(lambda: stdio_client(
-            StdioServerParameters(command="uvx", args=["docker-mcp"])
-        ))
-        _mcp_client.__enter__()
+        logger.info("🔌 Creating new Docker MCP client connection...")
+        try:
+            _mcp_client = MCPClient(lambda: stdio_client(
+                StdioServerParameters(command="uvx", args=["docker-mcp"])
+            ))
+            _mcp_client.__enter__()
+            logger.info("✅ Docker MCP client connected successfully")
+        except Exception as e:
+            logger.error(f"❌ Failed to create Docker MCP client: {e}")
+            raise
+    else:
+        logger.debug("♻️ Reusing existing Docker MCP client connection")
     return _mcp_client
 
 def _call_docker_tool(name, **kwargs):
     """Call a Docker MCP tool with the given arguments."""
+    logger.info(f"🐳 Calling Docker MCP tool: {name}")
+    logger.info(f"📋 Tool arguments: {json.dumps(kwargs, indent=2)}")
+    
     mcp_client = _get_mcp_client()
     tool_use_id = f"docker-{name}-{uuid.uuid4()}"
     
     # Make sure the name doesn't have angle brackets
     clean_name = name.strip('<>') if name.startswith('<') and name.endswith('>') else name
     
-    # Call the tool
-    result = mcp_client.call_tool_sync(
-        tool_use_id=tool_use_id,
-        name=clean_name,  # Use the clean name
-        arguments=kwargs
-    )
+    logger.info(f"🔧 Executing tool '{clean_name}' with ID: {tool_use_id}")
     
-    # Process the result
-    if result and result.get("status") == "success" and result.get("content"):
-        # Extract the content
-        for item in result.get("content", []):
-            if "text" in item:
-                try:
-                    # Try to parse as JSON
-                    return json.loads(item["text"])
-                except json.JSONDecodeError:
-                    # Return as text if not JSON
-                    return item["text"]
-    
-    # If we got here, something went wrong
-    return {"error": f"Error executing tool {name}", "result": result}
+    try:
+        # Call the tool
+        result = mcp_client.call_tool_sync(
+            tool_use_id=tool_use_id,
+            name=clean_name,  # Use the clean name
+            arguments=kwargs
+        )
+        
+        logger.info(f"📨 Raw MCP response: {json.dumps(result, indent=2) if result else 'None'}")
+        
+        # Process the result
+        if result and result.get("status") == "success" and result.get("content"):
+            logger.info("✅ Tool execution successful, processing content...")
+            # Extract the content
+            for item in result.get("content", []):
+                if "text" in item:
+                    try:
+                        # Try to parse as JSON
+                        parsed_result = json.loads(item["text"])
+                        logger.info(f"📊 Parsed JSON result: {json.dumps(parsed_result, indent=2)}")
+                        return parsed_result
+                    except json.JSONDecodeError:
+                        # Return as text if not JSON
+                        logger.info(f"📝 Text result: {item['text']}")
+                        return item["text"]
+        
+        # If we got here, something went wrong
+        error_result = {"error": f"Error executing tool {name}", "result": result}
+        logger.warning(f"⚠️ Tool execution failed: {json.dumps(error_result, indent=2)}")
+        return error_result
+        
+    except Exception as e:
+        error_msg = f"Exception calling Docker MCP tool {name}: {str(e)}"
+        logger.error(f"💥 {error_msg}")
+        return {"error": error_msg, "exception": str(e)}
 
 @tool
 def list_docker_containers(all: bool = True) -> dict:
@@ -64,8 +96,11 @@ def list_docker_containers(all: bool = True) -> dict:
     Returns:
         A dictionary containing the list of containers with their details.
     """
+    logger.info(f"🐳 list_docker_containers called with all={all}")
     args = {"all": all}
-    return _call_docker_tool("list-containers", **args)
+    result = _call_docker_tool("list-containers", **args)
+    logger.info(f"📋 list_docker_containers returning: {type(result).__name__}")
+    return result
 
 @tool
 def create_docker_container(image: str, name: str = None, ports: dict = None, 
@@ -93,20 +128,27 @@ def create_docker_container(image: str, name: str = None, ports: dict = None,
     Returns:
         A dictionary containing the container creation result.
     """
+    logger.info(f"🚀 create_docker_container called with image={image}, name={name}")
     args = {"image": image}
     
     if name:
         args["name"] = name
     if ports:
         args["ports"] = ports
+        logger.info(f"🔌 Port mappings: {ports}")
     if volumes:
         args["volumes"] = volumes
+        logger.info(f"💾 Volume mounts: {volumes}")
     if environment:
         args["environment"] = environment
+        logger.info(f"🔧 Environment variables: {environment}")
     if command:
         args["command"] = command
+        logger.info(f"⚙️ Custom command: {command}")
     
-    return _call_docker_tool("create-container", **args)
+    result = _call_docker_tool("create-container", **args)
+    logger.info(f"🚀 create_docker_container returning: {type(result).__name__}")
+    return result
 
 @tool
 def get_docker_logs(container: str, lines: int = 100, follow: bool = False) -> dict:
@@ -124,13 +166,16 @@ def get_docker_logs(container: str, lines: int = 100, follow: bool = False) -> d
     Returns:
         A dictionary containing the container logs.
     """
+    logger.info(f"📜 get_docker_logs called for container={container}, lines={lines}, follow={follow}")
     args = {
         "container": container,
         "lines": lines,
         "follow": follow
     }
     
-    return _call_docker_tool("get-logs", **args)
+    result = _call_docker_tool("get-logs", **args)
+    logger.info(f"📜 get_docker_logs returning: {type(result).__name__}")
+    return result
 
 @tool
 def deploy_docker_compose(compose_file: str = "docker-compose.yml", 
@@ -150,6 +195,7 @@ def deploy_docker_compose(compose_file: str = "docker-compose.yml",
     Returns:
         A dictionary containing the deployment result.
     """
+    logger.info(f"🐙 deploy_docker_compose called with compose_file={compose_file}, project_name={project_name}, detach={detach}")
     args = {
         "compose_file": compose_file,
         "detach": detach
@@ -158,7 +204,9 @@ def deploy_docker_compose(compose_file: str = "docker-compose.yml",
     if project_name:
         args["project_name"] = project_name
     
-    return _call_docker_tool("deploy-compose", **args)
+    result = _call_docker_tool("deploy-compose", **args)
+    logger.info(f"🐙 deploy_docker_compose returning: {type(result).__name__}")
+    return result
 
 @tool
 def use_docker(prompt: str):
@@ -170,8 +218,16 @@ def use_docker(prompt: str):
     it defaults to using Docker CLI commands.
     """
     
+    logger.info(f"🤖 use_docker called with prompt: {prompt}")
+    
     system_prompt = """
     You are a helpful Docker operations assistant with access to specialized Docker MCP tools and Docker CLI commands.
+    
+    LOGGING REQUIREMENT (CRITICAL):
+    - Before using ANY tool (MCP or shell), you MUST log what you're about to do
+    - Format: "I am using the [TOOL_NAME] tool to [ACTION_DESCRIPTION]"
+    - Example: "I am using the list_docker_containers tool to check all containers on the system"
+    - Example: "I am using the shell tool to execute: docker ps -a --format 'table {{.Names}}\t{{.Status}}'"
     
     AVAILABLE SPECIALIZED MCP TOOLS (use these when applicable):
     - list_docker_containers: List all Docker containers (running and stopped)
@@ -183,6 +239,7 @@ def use_docker(prompt: str):
     1. First, check if the requested operation can be handled by one of the specialized MCP tools above
     2. If not, use Docker CLI commands through the shell tool
     3. Always use the most appropriate tool for the task
+    4. ALWAYS announce which tool you're using and why before executing it
     
     COMMAND PREVIEW REQUIREMENT (CRITICAL):
     - Before executing ANY shell command, you MUST explicitly state: "I will execute the following command: `command_here`"
@@ -257,9 +314,9 @@ def use_docker(prompt: str):
     WORKFLOW:
     1. Analyze the user's request
     2. Determine if a specialized MCP tool can handle it
-    3. If yes, use the MCP tool
-    4. If no, state the Docker command you will execute: "I will execute the following command: `command`"
-    5. Execute the Docker CLI command via shell tool
+    3. Announce which tool you will use and why: "I am using the [TOOL_NAME] tool to [ACTION]"
+    4. If using shell, state the command: "I will execute the following command: `command`"
+    5. Execute the appropriate tool
     6. Present the results clearly to the user
     
     CONTAINER CREATION EXAMPLES:
@@ -286,5 +343,7 @@ def use_docker(prompt: str):
             shell,
         ])
 
+    logger.info("🚀 Starting Docker agent execution...")
     result = agent(prompt)
+    logger.info(f"✅ Docker agent execution completed, result type: {type(result).__name__}")
     return result

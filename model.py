@@ -26,7 +26,7 @@ def get_model():
         },
         # **model_config
         max_tokens=1028,
-        model_id="claude-3-7-sonnet-20250219",
+        model_id="claude-sonnet-4-20250514",
         params={
             "temperature": 0.7,
         }

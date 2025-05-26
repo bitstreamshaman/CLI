@@ -6,7 +6,7 @@ from strands import tool
 from ..utils import _call_gcp_tool
 
 @tool
-def list_gcp_gke_clusters(location: str = None) -> dict:
+def gcp_list_gke_clusters(location: str = None) -> dict:
     """
     List all Google Kubernetes Engine (GKE) clusters in a GCP project.
     
