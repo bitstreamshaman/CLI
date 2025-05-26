@@ -137,7 +137,16 @@ def get_model():
     api_key = get_api_key()
     
     if not api_key:
-        # Try interactive setup
+        # Show original error message first
+        error_message = Panel(
+            "[bold red]API KEY MISSING[/bold red]\n\n"
+            "You must assign [yellow]ANTHROPIC_API_KEY[/yellow] in your [blue].env[/blue] file before proceeding.",
+            title="⚠️ WARNING",
+            border_style="red"
+        )
+        print_console(error_message)
+        
+        # Then try interactive setup
         api_key = prompt_for_setup()
         
         if not api_key:
