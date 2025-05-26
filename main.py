@@ -10,7 +10,7 @@ from use_azure import use_azure
 from strands_tools import use_aws
 
 #Utils
-
+from use_docker import use_docker
 
 #Console output
 from rich.console import Console
@@ -89,7 +89,8 @@ if __name__ == "__main__":
         tools=[
             use_gcp, 
             use_aws,
-            use_azure
+            use_azure,
+            use_docker,
                ],
         model=get_model(),
         system_prompt=SYSTEM_PROMPT

@@ -6,7 +6,7 @@ from strands import tool
 from ..utils import _call_gcp_tool
 
 @tool
-def get_gcp_logs(filter_str: str = None, page_size: int = 10) -> dict:
+def gcp_get_logs(filter_str: str = None, page_size: int = 10) -> dict:
     """
     Get Cloud Logging entries for a GCP project.
     

@@ -6,7 +6,7 @@ from strands import tool
 from ..utils import _call_gcp_tool
 
 @tool
-def list_gcp_sql_instances() -> dict:
+def gcp_list_sql_instances() -> dict:
     """
     List all Cloud SQL instances in a GCP project.
     
