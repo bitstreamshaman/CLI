@@ -6,7 +6,7 @@ from strands_tools import shell
 import json
 import uuid
 import logging
-from model import get_model
+from ..model import get_model
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

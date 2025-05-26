@@ -1,4 +1,4 @@
-from use_azure.utils import _call_azure_tool
+from ..utils import _call_azure_tool
 from strands.tools import tool
 
 
