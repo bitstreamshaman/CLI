@@ -1,11 +1,92 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "cli"
+name = "ifw"
 version = "0.1.0"
-description = "Add your description here"
+description = "Infraware - AI-powered multi-cloud operations assistant for GCP, AWS, and Azure"
 readme = "README.md"
-requires-python = ">=3.13"
-dependencies = [
-    "anthropic>=0.52.0",
-    "strands-agents>=0.1.4",
-    "strands-agents-tools>=0.1.3",
+license = {text = "MIT"}
+authors = [
+    {name = "Your Name", email = "nick@infraware.dev"},
 ]
+maintainers = [
+    {name = "Your Name", email = "nick@infraware.dev"},
+]
+keywords = [
+    "cloud",
+    "aws", 
+    "gcp",
+    "azure",
+    "infrastructure",
+    "devops",
+    "cli",
+    "ai-assistant",
+    "multi-cloud"
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+    "Topic :: Internet",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "strands-agents",
+    "strands-agents-tools", 
+    "anthropic",
+    "rich>=10.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=6.0",
+    "black",
+    "isort",
+    "flake8",
+    "mypy",
+]
+
+[project.urls]
+Homepage = "https://github.com/yourusername/infraware-cli"
+Repository = "https://github.com/yourusername/infraware-cli"
+Documentation = "https://github.com/yourusername/infraware-cli#readme"
+"Bug Reports" = "https://github.com/yourusername/infraware-cli/issues"
+Changelog = "https://github.com/yourusername/infraware-cli/releases"
+
+[project.scripts]
+ifw = "ifw.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+# Development tools configuration
+[tool.black]
+line-length = 88
+target-version = ["py38", "py39", "py310", "py311", "py312", "py313"]
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
