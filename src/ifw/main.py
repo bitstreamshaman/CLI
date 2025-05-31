@@ -7,18 +7,18 @@ import os
 
 
 # Internal modules (relative imports)
-from .model import get_model
-from .use_gcp import use_gcp
-from .use_azure import use_azure
-from .use_docker import use_docker
+from .utils.model import get_model
+from .tools.use_gcp import use_gcp
+from .tools.use_azure import use_azure
+from .tools.use_docker import use_docker
+from .utils.banner import print_banner
+from .utils.callback_handler import CustomCallbackHandler
 
 # Console output
-from rich.console import Console
-from rich.markdown import Markdown
 from rich.prompt import Prompt
+from rich.console import Console 
 
 console = Console()
-
 SYSTEM_PROMPT = """
 You are Infraware Cloud Assistant, an expert AI cloud operations assistant specializing in multi-cloud environments. 
 You help users create,manage and operate their cloud infrastructure across Google Cloud Platform (GCP), Amazon Web Services (AWS) and Microsoft Azure (Azure) .
@@ -58,63 +58,6 @@ You help users create,manage and operate their cloud infrastructure across Googl
 Ready to help you manage your cloud infrastructure efficiently and effectively!
 """
 
-class CustomCallbackHandler:
-    """Callback handler using event-based completion detection."""
-    
-    def __init__(self):
-        self.tool_count = 0
-        self.previous_tool_use = None
-        self.text_buffer = ""
-
-    def __call__(self, **kwargs):
-        data = kwargs.get("data", "")
-        event = kwargs.get("event", {})
-        current_tool_use = kwargs.get("current_tool_use", {})
-
-        # Accumulate streaming text
-        if data:
-            self.text_buffer += data
-
-        # Check for completion using the messageStop event
-        if event and "messageStop" in event:
-            if self.text_buffer.strip():
-                console.print(Markdown(self.text_buffer.strip()))
-                console.print()
-                self.text_buffer = ""
-
-        # Handle tool usage display
-        if current_tool_use and current_tool_use.get("name"):
-            tool_name = current_tool_use.get("name", "Unknown tool")
-            if self.previous_tool_use != current_tool_use:
-                # If we have buffered text, render it before showing tool usage
-                if self.text_buffer.strip():
-                    console.print(Markdown(self.text_buffer.strip()))
-                    self.text_buffer = ""
-                
-                self.previous_tool_use = current_tool_use
-                self.tool_count += 1
-                console.print(f"\n[bold blue]Tool #{self.tool_count}: {tool_name}[/bold blue]")
-
-
-
-def print_banner():
-    """Print the Infraware banner."""
-    print("\n" + "="*60)
-    print("██╗███╗   ██╗███████╗██████╗  █████╗ ██╗    ██╗ █████╗ ██████╗ ███████╗")
-    print("██║████╗  ██║██╔════╝██╔══██╗██╔══██╗██║    ██║██╔══██╗██╔══██╗██╔════╝")
-    print("██║██╔██╗ ██║█████╗  ██████╔╝███████║██║ █╗ ██║███████║██████╔╝█████╗  ")
-    print("██║██║╚██╗██║██╔══╝  ██╔══██╗██╔══██║██║███╗██║██╔══██║██╔══██╗██╔══╝  ")
-    print("██║██║ ╚████║██║     ██║  ██║██║  ██║╚███╔███╔╝██║  ██║██║  ██║███████╗")
-    print("╚═╝╚═╝  ╚═══╝╚═╝     ╚═╝  ╚═╝╚═╝  ╚═╝ ╚══╝╚══╝ ╚═╝  ╚═╝╚═╝  ╚═╝╚══════╝")
-    print("")
-    print("                    ▶▶▶ INFRAWARE CLI ALPHA ◀◀◀")
-    print("                  Your AI Cloud Operations Helper")
-    print("                        |>| GCP & AWS & Azure |>|")
-    print("="*60)
-    print("\n🌟 Welcome! I can help you manage your GCP and AWS resources.")
-    print("💡 Commands: Type 'exit' to quit, 'clear' to clear screen, or ask me anything!")
-    print("-"*60)
-
 
 def chat(agent):
     """Enhanced chat with more Rich styling."""
@@ -122,17 +65,16 @@ def chat(agent):
         try:
             
             user_input = Prompt.ask(
-                "\n[bold cyan]|>|[/bold cyan]",
+                "\n[bold]|>|[/bold]",
                 default="",
                 show_default=False
             )
 
             if user_input.lower().strip() == "exit":
-                console.print("\n[bold green]👋 Thanks for using Infraware CLI! Goodbye![/bold green]")
+                console.print("\n👋 Thanks for using Infraware CLI! Goodbye!")
                 break
             elif user_input.lower().strip() == "clear":
                 os.system('cls' if os.name == 'nt' else 'clear')
-                print_banner()
                 continue
             elif user_input.strip() == "":
                 continue
