@@ -5,7 +5,6 @@ from strands import Agent
 from strands_tools import use_aws
 import os
 
-
 # Internal modules (relative imports)
 from .utils.model import get_model
 from .tools.use_gcp import use_gcp
@@ -13,6 +12,7 @@ from .tools.use_azure import use_azure
 from .tools.use_docker import use_docker
 from .utils.banner import print_banner
 from .utils.callback_handler import CustomCallbackHandler
+from .utils.thinking_indicator import start_thinking, stop_thinking
 
 # Console output
 from rich.prompt import Prompt
@@ -60,10 +60,9 @@ Ready to help you manage your cloud infrastructure efficiently and effectively!
 
 
 def chat(agent):
-    """Enhanced chat with more Rich styling."""
+    """Enhanced chat with thinking indicator."""
     while True:
         try:
-            
             user_input = Prompt.ask(
                 "\n[bold]|>|[/bold]",
                 default="",
@@ -79,17 +78,24 @@ def chat(agent):
             elif user_input.strip() == "":
                 continue
             
+            # Start thinking animation immediately after user input
+            thinking_control = start_thinking()
+            
+            
             console.print()
             agent(user_input)
+            console.print()
+
 
         except KeyboardInterrupt:
+            # Make sure to clean up thinking animation on Ctrl+C
+            if 'thinking_control' in locals():
+                stop_thinking(thinking_control)
             break
 
 
 def main():
     """Main entry point for the CLI application."""
-
-
     orchestrator_agent = Agent(
         tools=[
             use_gcp, 
