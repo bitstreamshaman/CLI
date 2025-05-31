@@ -21,7 +21,7 @@ class CustomCallbackHandler:
             
         self.is_typing = True
         
-        with Live("", refresh_per_second=30, console=console) as live:
+        with Live("", refresh_per_second=30, console=console, vertical_overflow="visible") as live:
             displayed_text = ""
             
             for char in text:
