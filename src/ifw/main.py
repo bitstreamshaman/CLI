@@ -5,6 +5,7 @@ from strands import Agent
 from strands_tools import use_aws
 import os
 
+
 # Internal modules (relative imports)
 from .model import get_model
 from .use_gcp import use_gcp
@@ -13,7 +14,8 @@ from .use_docker import use_docker
 
 # Console output
 from rich.console import Console
-from rich import print as console_print 
+from rich.markdown import Markdown
+from rich.prompt import Prompt
 
 console = Console()
 
@@ -56,43 +58,47 @@ You help users create,manage and operate their cloud infrastructure across Googl
 Ready to help you manage your cloud infrastructure efficiently and effectively!
 """
 
-def chat(agent: Agent):
-    while True:
-        try:
-            user_input = input("\n\n|>| ")
-
-            if user_input.lower().strip() == "exit":
-                print("Bye!")
-                break
-            elif user_input.lower().strip() == "clear":
-                os.system('cls' if os.name == 'nt' else 'clear')
-                continue
-            elif user_input == "":
-                print("DEBUG: Empty input, skipping")
-                continue
-            
-            print("\n")
-            response = agent(user_input)
-            console_print()
-
-        except KeyboardInterrupt:
-            break
-
-def main():
-    """Main entry point for the CLI application."""
+class CustomCallbackHandler:
+    """Callback handler using event-based completion detection."""
     
-    orchestrator_agent = Agent(
-        tools=[
-            use_gcp, 
-            use_aws,
-            use_azure,
-            use_docker,
-        ],
-        model=get_model(),
-        system_prompt=SYSTEM_PROMPT
-    )
+    def __init__(self):
+        self.tool_count = 0
+        self.previous_tool_use = None
+        self.text_buffer = ""
 
-    # Print Infraware banner
+    def __call__(self, **kwargs):
+        data = kwargs.get("data", "")
+        event = kwargs.get("event", {})
+        current_tool_use = kwargs.get("current_tool_use", {})
+
+        # Accumulate streaming text
+        if data:
+            self.text_buffer += data
+
+        # Check for completion using the messageStop event
+        if event and "messageStop" in event:
+            if self.text_buffer.strip():
+                console.print(Markdown(self.text_buffer.strip()))
+                console.print()
+                self.text_buffer = ""
+
+        # Handle tool usage display
+        if current_tool_use and current_tool_use.get("name"):
+            tool_name = current_tool_use.get("name", "Unknown tool")
+            if self.previous_tool_use != current_tool_use:
+                # If we have buffered text, render it before showing tool usage
+                if self.text_buffer.strip():
+                    console.print(Markdown(self.text_buffer.strip()))
+                    self.text_buffer = ""
+                
+                self.previous_tool_use = current_tool_use
+                self.tool_count += 1
+                console.print(f"\n[bold blue]Tool #{self.tool_count}: {tool_name}[/bold blue]")
+
+
+
+def print_banner():
+    """Print the Infraware banner."""
     print("\n" + "="*60)
     print("██╗███╗   ██╗███████╗██████╗  █████╗ ██╗    ██╗ █████╗ ██████╗ ███████╗")
     print("██║████╗  ██║██╔════╝██╔══██╗██╔══██╗██║    ██║██╔══██╗██╔══██╗██╔════╝")
@@ -108,9 +114,54 @@ def main():
     print("\n🌟 Welcome! I can help you manage your GCP and AWS resources.")
     print("💡 Commands: Type 'exit' to quit, 'clear' to clear screen, or ask me anything!")
     print("-"*60)
+
+
+def chat(agent):
+    """Enhanced chat with more Rich styling."""
+    while True:
+        try:
+            
+            user_input = Prompt.ask(
+                "\n[bold cyan]|>|[/bold cyan]",
+                default="",
+                show_default=False
+            )
+
+            if user_input.lower().strip() == "exit":
+                console.print("\n[bold green]👋 Thanks for using Infraware CLI! Goodbye![/bold green]")
+                break
+            elif user_input.lower().strip() == "clear":
+                os.system('cls' if os.name == 'nt' else 'clear')
+                print_banner()
+                continue
+            elif user_input.strip() == "":
+                continue
+            
+            console.print()
+            agent(user_input)
+
+        except KeyboardInterrupt:
+            break
+
+
+def main():
+    """Main entry point for the CLI application."""
     
-    # Start the chat loop
+    orchestrator_agent = Agent(
+        tools=[
+            use_gcp, 
+            use_aws,
+            use_azure,
+            use_docker,
+        ],
+        model=get_model(),
+        callback_handler=CustomCallbackHandler(),
+        system_prompt=SYSTEM_PROMPT
+    )
+
+    print_banner()
     chat(orchestrator_agent)
+
 
 if __name__ == "__main__":
     main()
