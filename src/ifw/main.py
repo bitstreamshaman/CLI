@@ -88,7 +88,8 @@ def chat(agent):
 
 def main():
     """Main entry point for the CLI application."""
-    
+
+
     orchestrator_agent = Agent(
         tools=[
             use_gcp, 
