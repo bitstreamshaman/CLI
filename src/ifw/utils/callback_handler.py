@@ -64,11 +64,6 @@ class CustomCallbackHandler:
         if not text.strip():
             return
             
-        # Optional: Show a brief "loading" indicator for very long content
-        if self._estimate_content_height(text) > console.size.height:
-            console.print("[dim]📄 Displaying response...[/dim]")
-            time.sleep(0.2)  # Brief pause to show the indicator
-        
         console.print(Markdown(text))
         console.print()  # Add spacing
 
