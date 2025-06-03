@@ -85,7 +85,9 @@ def is_shell_command(user_input: str) -> bool:
 def execute_shell_command(command: str) -> str:
     """Execute shell command using persistent executor, add to conversation history, and return output."""
     # Execute the command using the persistent executor
+    console.print("")
     output = executor.execute_shell_command(command)
+    console.print("")
     
     # Add shell command to conversation history in the correct format
     shell_command_message = {
@@ -201,6 +203,7 @@ def chat():
             thinking_control = start_thinking()
             try:
                 execute_ai_request(user_input)
+                console.print()
             except KeyboardInterrupt:
                 # Handle Ctrl+C during AI execution
                 console.print("\n🛑 AI request interrupted")
