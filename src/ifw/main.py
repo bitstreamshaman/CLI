@@ -192,7 +192,7 @@ def chat():
             username, hostname, cwd = get_prompt_info()
             
            # Create formatted prompt
-            prompt_text = HTML(f'<blue><b>|>| {username}@{hostname}:{cwd}:></b></blue> ')
+            prompt_text = HTML(f'<blue><b>|>| {username}@{hostname}:{cwd} </b></blue> ')
             
             # Get user input with enhanced features
             user_input = prompt(
