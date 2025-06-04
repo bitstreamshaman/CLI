@@ -49,6 +49,8 @@ dependencies = [
     "mem0ai>=0.1.104",
     "opensearch-py>=2.8.0",
     "rich>=10.0.0",
+    "strands-agents",
+    "strands-agents-tools"
 ]
 
 [project.optional-dependencies]
