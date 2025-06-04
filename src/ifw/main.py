@@ -4,6 +4,13 @@ from strands_tools import use_aws, shell
 import os
 import sys
 
+# Enhanced terminal input dependencies
+from prompt_toolkit import prompt
+from prompt_toolkit.history import InMemoryHistory
+from prompt_toolkit.shortcuts import CompleteStyle
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.formatted_text import HTML
+
 # Internal modules (relative imports)
 from .utils.model import get_model
 from .tools.use_gcp import use_gcp
@@ -15,8 +22,10 @@ from .utils.thinking_indicator import start_thinking, stop_thinking
 from .utils.is_shell import ShellCommandDetector
 from .utils.exec_shell import ShellExecutor
 
+# Import the completion system
+from .utils.completion import SmartCompleter
+
 # Console output
-from rich.prompt import Prompt
 from rich.console import Console 
 
 SYSTEM_PROMPT = """
@@ -64,6 +73,24 @@ detector = ShellCommandDetector()
 # Create a SINGLE persistent executor instance
 executor = ShellExecutor()
 
+# Create smart completer and command history
+smart_completer = SmartCompleter(executor)
+command_history = InMemoryHistory()
+
+# Create key bindings
+def create_key_bindings():
+    """Create custom key bindings."""
+    kb = KeyBindings()
+    
+    # Ctrl+L to clear screen
+    @kb.add('c-l')
+    def clear_screen(event):
+        event.app.renderer.clear()
+        
+    return kb
+
+key_bindings = create_key_bindings()
+
 orchestrator_agent = Agent(
     tools=[
         use_gcp, 
@@ -85,9 +112,7 @@ def is_shell_command(user_input: str) -> bool:
 def execute_shell_command(command: str) -> str:
     """Execute shell command using persistent executor, add to conversation history, and return output."""
     # Execute the command using the persistent executor
-    console.print("")
     output = executor.execute_shell_command(command)
-    console.print("")
     
     # Add shell command to conversation history in the correct format
     shell_command_message = {
@@ -118,7 +143,7 @@ def execute_control_command(command: str):
     cmd = command.lower().strip()
     
     if cmd == "exit":
-        console.print("\n👋 Thanks for using [bold cyan]Infraware CLI[/bold cyan] Goodbye!")
+        console.print("\n👋 Thanks for using [bold #2B1BD1]Infraware CLI[/bold #2B1BD1] Goodbye!")
         sys.exit(0)
 
     elif cmd == "clear":
@@ -134,13 +159,6 @@ def execute_control_command(command: str):
     elif command.strip() == "":
         return
 
-def classify_intent(user_input: str) -> str:
-    """Classify if input is 'shell', 'ai', or 'control'."""
-    if is_shell_command(user_input):
-        # Handle shell commands separately
-        output = execute_shell_command(user_input)
-        console.print(f"\n{output}\n")
-
 def execute_ai_request(user_input: str) -> bool:
     """Execute AI request with current shell context."""
     # You can optionally provide shell context to the AI
@@ -153,31 +171,38 @@ def execute_ai_request(user_input: str) -> bool:
     orchestrator_agent(contextual_input)
     console.print()
 
-def get_prompt() -> str:
+def get_prompt_info():
+    """Get prompt information for enhanced terminal."""
     import getpass
     import socket
     
     username = getpass.getuser()
     hostname = socket.gethostname()
-    cwd = executor.get_current_directory()  # Full path instead of basename
+    cwd = executor.get_current_directory()
     
-    return f"{username}@{hostname}:{cwd}"
-
+    return username, hostname, cwd
 
 def chat():
-    """Enhanced chat with thinking indicator and persistent shell state."""
-    console.print(f"🐚 Shell session started in: [bold cyan]{executor.get_current_directory()}[/bold cyan]")
+    """Enhanced chat with dynamic completion, command history, and reverse search."""
+
 
     while True:
         thinking_control = None  # Initialize outside try block
         try:
-           
-            prompt = get_prompt()
+            username, hostname, cwd = get_prompt_info()
             
-            user_input = Prompt.ask(
-                f"\n[bold cyan]|>| {prompt}[/bold cyan]",
-                default="",
-                show_default=False
+           # Create formatted prompt
+            prompt_text = HTML(f'<blue><b>|>| {username}@{hostname}:{cwd}:></b></blue> ')
+            
+            # Get user input with enhanced features
+            user_input = prompt(
+                prompt_text,
+                completer=smart_completer,
+                history=command_history,
+                complete_style=CompleteStyle.READLINE_LIKE,
+                key_bindings=key_bindings,
+                enable_history_search=True,  # Enables Ctrl+R reverse search
+                complete_while_typing=False,  # Set to True for real-time completion
             )
 
             # Check if input is a control command
@@ -185,13 +210,12 @@ def chat():
                 execute_control_command(user_input)
                 continue
                 
-                
             # Check if input is a shell command
             if is_shell_command(user_input):
                 # Handle shell commands separately
                 output = execute_shell_command(user_input)
                 if output:  # Only print if there's output
-                    console.print(f"\n{output}")
+                    console.print(f"{output}")
                 continue
 
             if user_input.strip() == "":
@@ -226,6 +250,10 @@ def chat():
             else:
                 console.print("\n🛑 Use 'exit' to quit")
             continue
+        except EOFError:
+            # Handle Ctrl+D (EOF)
+            console.print("\n👋 Thanks for using [bold #2B1BD1]Infraware CLI[/bold #2B1BD1] Goodbye!")
+            sys.exit(0)
 
 def main():
     """Main entry point for the CLI application."""
