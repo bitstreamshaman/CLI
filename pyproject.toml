@@ -45,9 +45,9 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "strands-agents",
-    "strands-agents-tools", 
     "anthropic",
+    "mem0ai>=0.1.104",
+    "opensearch-py>=2.8.0",
     "rich>=10.0.0",
 ]
 
