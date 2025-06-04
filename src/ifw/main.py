@@ -66,6 +66,12 @@ You also have expertise in Docker container management and orchestration.
 - "Compare costs between my GCP and AWS usage"
 - "Deploy a new Kubernetes cluster in Azure"
 - "Help me troubleshoot connectivity issues"
+
+IMPORTANT: Always print every command you execute in the terminal before using the shell tool.
+EXAMPLE:
+
+I will execute the following command in the terminal: ls -l /home/user
+
 """
 
 console = Console()
