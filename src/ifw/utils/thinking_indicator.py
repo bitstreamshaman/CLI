@@ -1,6 +1,4 @@
 from rich.console import Console
-from rich.spinner import Spinner
-from rich.live import Live
 
 console = Console()
 

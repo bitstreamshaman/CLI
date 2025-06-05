@@ -148,6 +148,11 @@ AUTHENTICATION NOTES:
 - The Azure MCP server uses DefaultAzureCredential which supports multiple authentication methods
 - Ensure you're logged in via Azure CLI (`az login`) or have appropriate environment variables set
 - For production scenarios, consider using managed identities or service principals
+
+CRITICAL: Always print a command before executing it in the terminal.
+EXAMPLE:
+
+I will execute the following command in the terminal: az vm list --resource-group myResourceGroup --output table
 """
     
     agent = Agent(

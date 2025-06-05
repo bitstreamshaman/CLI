@@ -282,6 +282,11 @@ def use_docker(prompt: str):
     - Check port conflicts for new containers
     - Ensure sufficient disk space for operations
     - Check network connectivity for image pulls
+
+    CRITICAL: Always print a command before executing it in the terminal.
+    EXAMPLE:
+
+    I will execute the following command in the terminal: docker ps -a
     """
     
     agent = Agent(
