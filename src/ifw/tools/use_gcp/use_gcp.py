@@ -108,6 +108,11 @@ def use_gcp(prompt: str):
     - The GCP MCP server uses Application Default Credentials (ADC)
     - Ensure you're logged in via gcloud CLI (`gcloud auth login`) or have appropriate service account credentials
     - For production scenarios, consider using service account keys or workload identity
+
+    CRITICAL: Always print a command before executing it in the terminal.
+    EXAMPLE:
+
+    I will execute the following command in the terminal: gcloud compute networks subnets list 
     """
     
     # Create agent with dynamically discovered tools

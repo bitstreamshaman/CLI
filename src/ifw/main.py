@@ -67,10 +67,32 @@ You also have expertise in Docker container management and orchestration.
 - "Deploy a new Kubernetes cluster in Azure"
 - "Help me troubleshoot connectivity issues"
 
-IMPORTANT: Always print every command you execute in the terminal before using the shell tool.
-EXAMPLE:
+MANDATORY COMMAND DISCLOSURE FOR SHELL OPERATIONS: You MUST always explicitly state every command before executing it in the terminal/shell. This requirement applies ONLY to shell/terminal commands, NOT to custom MCP tools or other specialized tools.
 
-I will execute the following command in the terminal: ls -l /home/user
+SCOPE:
+- APPLIES TO: Shell commands, terminal operations, bash/zsh/cmd commands
+- DOES NOT APPLY TO: Custom MCP tools, API calls, specialized function calls, or non-shell operations
+
+REQUIRED FORMAT:
+Before executing any shell command, you must write:
+"EXECUTING SHELL COMMAND: [exact command]"
+
+EXAMPLES:
+- EXECUTING SHELL COMMAND: ls -l /home/user
+- EXECUTING SHELL COMMAND: cd /var/log && tail -f syslog
+- EXECUTING SHELL COMMAND: sudo systemctl restart nginx
+- EXECUTING SHELL COMMAND: grep "error" /var/log/apache2/error.log
+
+ENFORCEMENT RULES:
+1. Never execute a shell command without first printing it using the exact format above
+2. This applies to ALL shell commands - no matter how simple or obvious
+3. If you need to run multiple shell commands, print each one separately before execution
+4. Even basic commands like 'pwd', 'whoami', or 'ls' must be announced first
+5. This requirement is specific to shell/terminal operations only
+6. Custom MCP tools and other specialized functions do not require this disclosure
+7. Failure to follow this format for shell commands indicates non-compliance with system requirements
+
+This disclosure requirement exists for transparency, security, and audit purposes when interacting with the system shell. Non-compliance is not acceptable under any circumstances for shell operations.
 
 """
 
@@ -119,6 +141,10 @@ def execute_shell_command(command: str) -> str:
     """Execute shell command using persistent executor, add to conversation history, and return output."""
     # Execute the command using the persistent executor
     output = executor.execute_shell_command(command)
+    
+    # If there's an error message (starts with ❌), print it to console
+    if output and output.startswith("❌"):
+        console.print(output)
     
     # Add shell command to conversation history in the correct format
     shell_command_message = {
@@ -219,10 +245,9 @@ def chat():
             # Check if input is a shell command
             if is_shell_command(user_input):
                 # Handle shell commands separately
-                output = execute_shell_command(user_input)
-                if output:  # Only print if there's output
-                    console.print(f"{output}")
+                execute_shell_command(user_input)
                 continue
+
 
             if user_input.strip() == "":
                 # Skip empty input
