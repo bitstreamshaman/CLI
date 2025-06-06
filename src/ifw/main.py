@@ -142,19 +142,28 @@ def execute_shell_command(command: str) -> str:
     # Execute the command using the persistent executor
     output = executor.execute_shell_command(command)
     
-    # If there's an error message (starts with ❌), print it to console
+    # Determine what to store in conversation history
     if output and output.startswith("❌"):
+        # Error case
+        history_output = output
         console.print(output)
+    elif output and output.strip():
+        # Command produced actual output
+        history_output = output
+    else:
+        # Command succeeded but no meaningful output (like mkdir, cd, etc.)
+        # Store a confirmation message instead of empty string
+        history_output = f"✓ Executed: {command}"
     
     # Add shell command to conversation history in the correct format
     shell_command_message = {
         'role': 'user', 
-        'content': [{'text': f'{command}'}]
+        'content': [{'text': command}]
     }
     
     shell_result_message = {
         'role': 'assistant', 
-        'content': [{'text': f'{output}'}]
+        'content': [{'text': history_output}]
     }
     
     # Add to agent's conversation history
