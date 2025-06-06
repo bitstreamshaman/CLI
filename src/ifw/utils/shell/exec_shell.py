@@ -54,89 +54,94 @@ class ShellExecutor:
             return f"❌ Error executing command: {str(e)}"
     
     def _execute_with_pty(self, command: str) -> str:
-     """Execute command using PTY with full terminal emulation."""
-     try:
-         # Clear output buffer
-         self.output_buffer.clear()
-         self.stop_io.clear()
-         
-         # Save terminal settings
-         if sys.stdin.isatty():
-             self.original_settings = termios.tcgetattr(sys.stdin.fileno())
-         
-         # Create PTY pair
-         self.master_fd, self.slave_fd = pty.openpty()
-         
-         # Get user's shell
-         user_shell = os.environ.get('SHELL', '/bin/bash')
-         
-         # Build command that explicitly sources config files and then runs the command
-         if 'bash' in user_shell:
-             # For bash, source .bashrc if it exists
-             wrapped_command = f"[ -f ~/.bashrc ] && source ~/.bashrc; {command}"
-         elif 'zsh' in user_shell:
-             # For zsh, source .zshrc if it exists
-             wrapped_command = f"[ -f ~/.zshrc ] && source ~/.zshrc; {command}"
-         else:
-             # For other shells, just use the command as-is
-             wrapped_command = command
-         
-         # Create the process with PTY - use interactive mode to load aliases
-         self.process = subprocess.Popen(
-             [user_shell, '-i', '-c', wrapped_command],
-             stdin=self.slave_fd,
-             stdout=self.slave_fd,
-             stderr=self.slave_fd,
-             cwd=self.current_dir,
-             env=self.env_vars,
-             preexec_fn=os.setsid if os.name != 'nt' else None
-         )
-         
-         # Close slave end in parent process
-         os.close(self.slave_fd)
-         self.slave_fd = None
-         
-         # Set terminal to raw mode if we're in a TTY
-         if sys.stdin.isatty():
-             tty.setraw(sys.stdin.fileno())
-         
-         # Start I/O handling thread
-         self.io_thread = threading.Thread(target=self._handle_pty_io, daemon=True)
-         self.io_thread.start()
-         
-         # Wait for process completion
-         exit_code = self.process.wait()
-         
-         # Stop I/O thread
-         self.stop_io.set()
-         if self.io_thread:
-             self.io_thread.join(timeout=1.0)
-         
-         # Update directory state (try to detect if it changed)
-         self._update_directory_state()
-         
-         # Get the captured output for conversation history
-         captured_output = ''.join(self.output_buffer).strip()
-         
-         # Return the captured output for conversation history
-         if exit_code == 0:
-             return captured_output  # Return actual output instead of empty string
-         else:
-             error_msg = f"❌ Command exited with code {exit_code}"
-             if captured_output:
-                 return f"{captured_output}\n{error_msg}"
-             else:
-                 return error_msg
-             
-     except KeyboardInterrupt:
-         self._cleanup_pty()
-         return "🛑 Command interrupted"
-     except Exception as e:
-         self._cleanup_pty()
-         return f"❌ Error executing command: {str(e)}"
-     finally:
-        self._cleanup_pty()
-    
+        """Execute command using PTY with full terminal emulation."""
+        try:
+            # Clear output buffer
+            self.output_buffer.clear()
+            self.stop_io.clear()
+
+            # Save terminal settings
+            if sys.stdin.isatty():
+                self.original_settings = termios.tcgetattr(sys.stdin.fileno())
+
+            # Create PTY pair
+            self.master_fd, self.slave_fd = pty.openpty()
+
+            # Get user's shell
+            user_shell = os.environ.get('SHELL', '/bin/bash')
+
+            # Build command that explicitly sources config files and then runs the command
+            if 'bash' in user_shell:
+                wrapped_command = f"[ -f ~/.bashrc ] && source ~/.bashrc; {command}"
+            elif 'zsh' in user_shell:
+                wrapped_command = f"[ -f ~/.zshrc ] && source ~/.zshrc; {command}"
+            else:
+                wrapped_command = command
+
+            # Create the process with PTY
+            self.process = subprocess.Popen(
+                [user_shell, '-i', '-c', wrapped_command],
+                stdin=self.slave_fd,
+                stdout=self.slave_fd,
+                stderr=self.slave_fd,
+                cwd=self.current_dir,
+                env=self.env_vars,
+                preexec_fn=os.setsid if os.name != 'nt' else None
+            )
+
+            # Close slave end in parent process
+            os.close(self.slave_fd)
+            self.slave_fd = None
+
+            # Set terminal to raw mode if we're in a TTY
+            if sys.stdin.isatty():
+                tty.setraw(sys.stdin.fileno())
+
+            # Start I/O handling thread
+            self.io_thread = threading.Thread(target=self._handle_pty_io, daemon=True)
+            self.io_thread.start()
+
+            # Wait for process completion
+            exit_code = self.process.wait()
+
+            # Stop I/O thread and give it time to capture final output
+            self.stop_io.set()
+            if self.io_thread:
+                self.io_thread.join(timeout=1.0)
+
+            # Update directory state
+            self._update_directory_state()
+
+            # Get the captured output for conversation history
+            captured_output = ''.join(self.output_buffer).strip()
+
+            # Clean ANSI escape codes from output for better conversation history
+            import re
+            clean_output = re.sub(r'\x1b\[[0-9;]*[mK]', '', captured_output)
+            clean_output = clean_output.strip()
+
+            # Return appropriate output based on exit code
+            if exit_code == 0:
+                # For successful commands, return the clean output
+                # If no output, return empty string (main.py will handle this)
+                return clean_output
+            else:
+                # For failed commands, include error information
+                error_msg = f"❌ Command exited with code {exit_code}"
+                if clean_output:
+                    return f"{clean_output}\n{error_msg}"
+                else:
+                    return error_msg
+
+        except KeyboardInterrupt:
+            self._cleanup_pty()
+            return "🛑 Command interrupted"
+        except Exception as e:
+            self._cleanup_pty()
+            return f"❌ Error executing command: {str(e)}"
+        finally:
+            self._cleanup_pty()
+
     def _handle_pty_io(self):
         """Handle bidirectional I/O between terminal and process."""
         try:
