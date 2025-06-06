@@ -50,7 +50,8 @@ dependencies = [
     "opensearch-py>=2.8.0",
     "rich>=10.0.0",
     "strands-agents",
-    "strands-agents-tools"
+    "strands-agents-tools",
+    "thefuzz>=0.22.1",
 ]
 
 [project.optional-dependencies]
