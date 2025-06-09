@@ -1,5 +1,8 @@
 """This module provides the implementation for the retrieving completion results
 from bash.
+
+A Special thanks to the xonsh team for their work on the 
+xonsh shell from which i took this code, go check them out at: https://github.com/xonsh/xonsh.git
 """
 
 # developer note: this file should not perform any action on import.
@@ -956,5 +959,3 @@ def _bc_main(args=None):
         print(o)
 
 
-if __name__ == "__main__":
-    _bc_main()
