@@ -10,6 +10,8 @@ import tty
 import threading
 import time
 from typing import Optional, Callable
+import struct
+import fcntl
 
 class ShellExecutor:
     def __init__(self):
@@ -53,6 +55,26 @@ class ShellExecutor:
         except Exception as e:
             return f"❌ Error executing command: {str(e)}"
     
+    def _get_terminal_size(self):
+        """Get current terminal size."""
+        if sys.stdout.isatty():
+            try:
+                size = struct.unpack('hh', fcntl.ioctl(sys.stdout.fileno(), termios.TIOCGWINSZ, '1234'))
+                return size
+            except:
+                pass
+        return (24, 80)  # Default size
+    
+    def _set_pty_size(self, fd):
+        """Set PTY size to match current terminal."""
+        if fd and sys.stdout.isatty():
+            try:
+                rows, cols = self._get_terminal_size()
+                size = struct.pack('HHHH', rows, cols, 0, 0)
+                fcntl.ioctl(fd, termios.TIOCSWINSZ, size)
+            except:
+                pass
+    
     def _execute_with_pty(self, command: str) -> str:
         """Execute command using PTY with full terminal emulation."""
         try:
@@ -66,21 +88,16 @@ class ShellExecutor:
 
             # Create PTY pair
             self.master_fd, self.slave_fd = pty.openpty()
+            
+            # Set PTY size to match terminal
+            self._set_pty_size(self.master_fd)
 
             # Get user's shell
             user_shell = os.environ.get('SHELL', '/bin/bash')
 
-            # Build command that explicitly sources config files and then runs the command
-            if 'bash' in user_shell:
-                wrapped_command = f"[ -f ~/.bashrc ] && source ~/.bashrc; {command}"
-            elif 'zsh' in user_shell:
-                wrapped_command = f"[ -f ~/.zshrc ] && source ~/.zshrc; {command}"
-            else:
-                wrapped_command = command
-
-            # Create the process with PTY
+            # Start the shell process
             self.process = subprocess.Popen(
-                [user_shell, '-i', '-c', wrapped_command],
+                [user_shell, '-c', command],
                 stdin=self.slave_fd,
                 stdout=self.slave_fd,
                 stderr=self.slave_fd,
@@ -93,10 +110,6 @@ class ShellExecutor:
             os.close(self.slave_fd)
             self.slave_fd = None
 
-            # Set terminal to raw mode if we're in a TTY
-            if sys.stdin.isatty():
-                tty.setraw(sys.stdin.fileno())
-
             # Start I/O handling thread
             self.io_thread = threading.Thread(target=self._handle_pty_io, daemon=True)
             self.io_thread.start()
@@ -107,9 +120,9 @@ class ShellExecutor:
             # Stop I/O thread and give it time to capture final output
             self.stop_io.set()
             if self.io_thread:
-                self.io_thread.join(timeout=1.0)
+                self.io_thread.join(timeout=0.5)
 
-            # Update directory state
+            # Update directory state after command execution
             self._update_directory_state()
 
             # Get the captured output for conversation history
@@ -144,16 +157,17 @@ class ShellExecutor:
 
     def _handle_pty_io(self):
         """Handle bidirectional I/O between terminal and process."""
+        raw_mode_set = False
         try:
             while not self.stop_io.is_set() and self.process and self.process.poll() is None:
                 # Check for available input/output with timeout
                 ready_fds = []
                 try:
+                    fds_to_check = [self.master_fd]
                     if sys.stdin.isatty():
-                        ready_fds, _, _ = select.select([sys.stdin, self.master_fd], [], [], 0.1)
-                    else:
-                        # Non-interactive mode - only read from process
-                        ready_fds, _, _ = select.select([self.master_fd], [], [], 0.1)
+                        fds_to_check.append(sys.stdin)
+                    
+                    ready_fds, _, _ = select.select(fds_to_check, [], [], 0.1)
                 except (OSError, ValueError):
                     break
                 
@@ -167,28 +181,39 @@ class ShellExecutor:
                         
                         elif fd == self.master_fd:
                             # Read from process and send to terminal/capture
-                            data = os.read(self.master_fd, 1024)
+                            data = os.read(self.master_fd, 4096)
                             if data:
-                                # Decode and capture output
+                                # Check if we need to switch to raw mode
+                                if not raw_mode_set and sys.stdin.isatty():
+                                    data_str = data.decode('utf-8', errors='ignore')
+                                    # Look for signs that a program wants raw mode
+                                    if any(seq in data_str for seq in [
+                                        '\x1b[?1049h',  # Alternate screen buffer
+                                        '\x1b[?1h',     # Application cursor keys
+                                        '\x1b[?47h',    # Alternate screen
+                                        '\x1b=',        # Application keypad mode
+                                    ]):
+                                        try:
+                                            tty.setraw(sys.stdin.fileno())
+                                            raw_mode_set = True
+                                        except:
+                                            pass
+                                
+                                # Always write to terminal
+                                if sys.stdout.isatty():
+                                    os.write(sys.stdout.fileno(), data)
+                                    sys.stdout.flush()
+                                
+                                # Capture output for non-interactive commands
                                 try:
                                     text = data.decode('utf-8', errors='replace')
-                                    if self.capture_output:
-                                        self.output_buffer.append(text)
-                                    
-                                    # Send to terminal if in TTY mode
-                                    if sys.stdout.isatty():
-                                        os.write(sys.stdout.fileno(), data)
-                                        sys.stdout.flush()
+                                    self.output_buffer.append(text)
                                     
                                     # Call output callback if set
                                     if self.output_callback:
                                         self.output_callback(text)
-                                        
-                                except UnicodeDecodeError:
-                                    # Handle binary data
-                                    if sys.stdout.isatty():
-                                        os.write(sys.stdout.fileno(), data)
-                                        sys.stdout.flush()
+                                except:
+                                    pass
                             else:
                                 # EOF from process
                                 break
@@ -200,12 +225,30 @@ class ShellExecutor:
         except Exception as e:
             # Log error but don't crash
             pass
+        finally:
+            # Restore terminal if we set raw mode
+            if raw_mode_set and self.original_settings and sys.stdin.isatty():
+                try:
+                    termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, self.original_settings)
+                except:
+                    pass
     
     def _cleanup_pty(self):
         """Clean up PTY resources and restore terminal settings."""
         try:
             # Stop I/O thread
             self.stop_io.set()
+            
+            # Ensure we're on a new line after the command
+            if sys.stdout.isatty():
+                try:
+                    # Check if we need a newline
+                    # This helps with commands that don't end with a newline
+                    if self.output_buffer and not self.output_buffer[-1].endswith('\n'):
+                        sys.stdout.write('\n')
+                        sys.stdout.flush()
+                except:
+                    pass
             
             # Restore terminal settings
             if self.original_settings and sys.stdin.isatty():
@@ -248,23 +291,9 @@ class ShellExecutor:
     
     def _update_directory_state(self):
         """Try to detect if the working directory changed during command execution."""
-        try:
-            # This is a best-effort attempt - PTY commands might change directory
-            # We can try to detect this by running 'pwd' in a separate process
-            result = subprocess.run(
-                ['pwd'], 
-                cwd=self.current_dir, 
-                capture_output=True, 
-                text=True,
-                env=self.env_vars
-            )
-            if result.returncode == 0:
-                detected_dir = result.stdout.strip()
-                if detected_dir and os.path.isdir(detected_dir):
-                    self.current_dir = detected_dir
-        except:
-            # If detection fails, keep current directory
-            pass
+        # Since we're running commands in a subprocess, cd won't affect our parent
+        # We need to handle cd specially in _handle_builtin_command
+        pass
     
     def _handle_builtin_command(self, command: str) -> bool:
         """Handle commands that need special state management."""
@@ -272,9 +301,9 @@ class ShellExecutor:
         if not cmd_parts:
             return False
             
-        # Only handle commands that truly need state persistence
-        builtin_commands = ['cd', 'pwd', 'export', 'unset']
-        return cmd_parts[0] in builtin_commands
+        # Only handle cd for state persistence
+        # Let the shell handle export, unset, etc. normally
+        return cmd_parts[0] == 'cd'
     
     def _get_builtin_output(self, command: str) -> str:
         """Execute built-in commands with state persistence."""
@@ -284,12 +313,6 @@ class ShellExecutor:
         try:
             if cmd == 'cd':
                 return self._handle_cd_command(cmd_parts)
-            elif cmd == 'pwd':
-                return self.current_dir
-            elif cmd == 'export':
-                return self._handle_export_command(cmd_parts)
-            elif cmd == 'unset':
-                return self._handle_unset_command(cmd_parts)
             else:
                 return ""
                 
@@ -320,36 +343,13 @@ class ShellExecutor:
             if os.path.isdir(resolved_path):
                 self.previous_dir = self.current_dir
                 self.current_dir = resolved_path
+                # Update the environment variable
+                self.env_vars['PWD'] = resolved_path
                 return ""
             else:
                 return f"❌ cd: no such file or directory: {cmd_parts[1] if len(cmd_parts) > 1 else '~'}"
         except Exception as e:
             return f"❌ cd: {str(e)}"
-    
-    def _handle_export_command(self, cmd_parts: list) -> str:
-        """Handle export command to set environment variables."""
-        if len(cmd_parts) < 2:
-            return "\n".join([f"{k}={v}" for k, v in self.env_vars.items() if not k.startswith('_')])
-        
-        for assignment in cmd_parts[1:]:
-            if '=' in assignment:
-                key, value = assignment.split('=', 1)
-                self.env_vars[key] = value
-            else:
-                if assignment in os.environ:
-                    self.env_vars[assignment] = os.environ[assignment]
-        
-        return ""
-    
-    def _handle_unset_command(self, cmd_parts: list) -> str:
-        """Handle unset command to remove environment variables."""
-        if len(cmd_parts) < 2:
-            return "❌ unset: not enough arguments"
-        
-        for var_name in cmd_parts[1:]:
-            self.env_vars.pop(var_name, None)
-        
-        return ""
     
     def interrupt_current_command(self):
         """Interrupt currently running command."""

@@ -60,10 +60,13 @@ You also have expertise in Docker container management and orchestration.
 - "List all my Azure resource groups"
 - "Set up monitoring for my AWS Lambda functions"
 - "Create a Docker container for my web app"
+- "What's my hostname and current directory?"
 - "Deploy a new service in my Kubernetes cluster"
 - "Compare costs between my GCP and AWS usage"
 - "Deploy a new Kubernetes cluster in Azure"
 - "Help me troubleshoot connectivity issues"
+- "List all files in my Docker container"
+
 
 MANDATORY COMMAND DISCLOSURE FOR SHELL OPERATIONS: You MUST always explicitly state every command before executing it in the terminal/shell. This requirement applies ONLY to shell/terminal commands, NOT to custom MCP tools or other specialized tools.
 
@@ -96,7 +99,6 @@ This disclosure requirement exists for transparency, security, and audit purpose
 
 console = Console()
 detector = ShellCommandDetector()
-# Create a SINGLE persistent executor instance
 executor = ShellExecutor()
 
 # Create smart completer and command history
