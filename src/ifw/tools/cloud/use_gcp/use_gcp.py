@@ -4,7 +4,7 @@ Main GCP operations tool using dynamic tool discovery and MCP integration.
 
 from strands import Agent, tool
 from strands_tools import shell
-from ...utils.model import get_model
+from ....utils.model import get_model
 
 # Import all tools from each module
 from .tools.projects import *

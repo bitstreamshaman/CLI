@@ -5,7 +5,7 @@ from strands.tools.mcp import MCPClient
 from strands_tools import shell
 import json
 import uuid
-from ...utils.model import get_model
+from ....utils.model import get_model
 
 
 # Storage for our MCP client to maintain connection

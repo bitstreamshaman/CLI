@@ -1,7 +1,7 @@
 # System imports
 from strands import Agent, tool
 from strands_tools import shell
-from ...utils.model import get_model
+from ....utils.model import get_model
 import inspect
 
 
