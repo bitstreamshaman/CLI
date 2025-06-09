@@ -35,6 +35,9 @@ class ShellExecutor:
         self.io_thread: Optional[threading.Thread] = None
         self.stop_io = threading.Event()
         
+        # DYNAMIC alternate screen detection
+        self.used_alternate_screen = False
+        
     def set_output_callback(self, callback: Callable[[str], None]):
         """Set callback function to receive real-time output."""
         self.output_callback = callback
@@ -44,6 +47,9 @@ class ShellExecutor:
         try:
             # Store command in history
             self.shell_history.append(command)
+            
+            # Reset alternate screen tracking for this command
+            self.used_alternate_screen = False
             
             # Handle special built-in commands that need state management
             if self._handle_builtin_command(command):
@@ -89,15 +95,23 @@ class ShellExecutor:
             # Create PTY pair
             self.master_fd, self.slave_fd = pty.openpty()
             
-            # Set PTY size to match terminal
+            # KEEP: Set PTY size to match terminal
             self._set_pty_size(self.master_fd)
 
             # Get user's shell
             user_shell = os.environ.get('SHELL', '/bin/bash')
 
-            # Start the shell process
+            # KEEP: Build command that explicitly sources config files and then runs the command
+            if 'bash' in user_shell:
+                wrapped_command = f"[ -f ~/.bashrc ] && source ~/.bashrc; {command}"
+            elif 'zsh' in user_shell:
+                wrapped_command = f"[ -f ~/.zshrc ] && source ~/.zshrc; {command}"
+            else:
+                wrapped_command = command
+
+            # KEEP: Create the process with PTY (this works for aliases!)
             self.process = subprocess.Popen(
-                [user_shell, '-c', command],
+                [user_shell, '-i', '-c', wrapped_command],
                 stdin=self.slave_fd,
                 stdout=self.slave_fd,
                 stderr=self.slave_fd,
@@ -110,6 +124,10 @@ class ShellExecutor:
             os.close(self.slave_fd)
             self.slave_fd = None
 
+            # KEEP: Set terminal to raw mode if we're in a TTY
+            if sys.stdin.isatty():
+                tty.setraw(sys.stdin.fileno())
+
             # Start I/O handling thread
             self.io_thread = threading.Thread(target=self._handle_pty_io, daemon=True)
             self.io_thread.start()
@@ -120,9 +138,9 @@ class ShellExecutor:
             # Stop I/O thread and give it time to capture final output
             self.stop_io.set()
             if self.io_thread:
-                self.io_thread.join(timeout=0.5)
+                self.io_thread.join(timeout=1.0)
 
-            # Update directory state after command execution
+            # Update directory state
             self._update_directory_state()
 
             # Get the captured output for conversation history
@@ -183,9 +201,19 @@ class ShellExecutor:
                             # Read from process and send to terminal/capture
                             data = os.read(self.master_fd, 4096)
                             if data:
+                                # DYNAMIC: Detect alternate screen usage
+                                data_str = data.decode('utf-8', errors='ignore')
+                                
+                                # Check for alternate screen entry sequences
+                                if any(seq in data_str for seq in [
+                                    '\x1b[?1049h',  # Alternate screen buffer
+                                    '\x1b[?47h',    # Alternate screen (older)
+                                    '\x1b[?1047h',  # Alternate screen (xterm)
+                                ]):
+                                    self.used_alternate_screen = True
+                                
                                 # Check if we need to switch to raw mode
                                 if not raw_mode_set and sys.stdin.isatty():
-                                    data_str = data.decode('utf-8', errors='ignore')
                                     # Look for signs that a program wants raw mode
                                     if any(seq in data_str for seq in [
                                         '\x1b[?1049h',  # Alternate screen buffer
@@ -199,7 +227,7 @@ class ShellExecutor:
                                         except:
                                             pass
                                 
-                                # Always write to terminal
+                                # Always write to terminal (shows colors!)
                                 if sys.stdout.isatty():
                                     os.write(sys.stdout.fileno(), data)
                                     sys.stdout.flush()
@@ -238,6 +266,27 @@ class ShellExecutor:
         try:
             # Stop I/O thread
             self.stop_io.set()
+            
+            # DYNAMIC CURSOR FIX: Only fix cursor if alternate screen was used
+            if self.used_alternate_screen and sys.stdout.isatty():
+                try:
+                    # Send minimal terminal reset sequences
+                    reset_sequences = [
+                        '\x1b[?1049l',  # Exit alternate screen buffer
+                        '\x1b[?47l',    # Exit alternate screen (older)
+                        '\x1b[?1047l',  # Exit alternate screen (xterm)
+                        '\x1b[0m',      # Reset all attributes
+                    ]
+                    
+                    for seq in reset_sequences:
+                        sys.stdout.write(seq)
+                    sys.stdout.flush()
+                    
+                    # Very small delay to let terminal process
+                    time.sleep(0.005)
+                    
+                except Exception:
+                    pass
             
             # Ensure we're on a new line after the command
             if sys.stdout.isatty():
