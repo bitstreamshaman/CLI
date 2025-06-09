@@ -19,11 +19,9 @@ from .tools.use_docker import use_docker
 from .utils.banner import print_banner
 from .utils.callback_handler import CustomCallbackHandler
 from .utils.thinking_indicator import start_thinking, stop_thinking
-from .utils.shell.is_shell import ShellCommandDetector
-from .utils.shell.exec_shell import ShellExecutor
-
-# Import the completion system
-from .utils.shell.completion import SmartCompleter
+from .shell.is_shell import ShellCommandDetector
+from .shell.exec_shell import ShellExecutor
+from .shell.completion import SmartCompleter
 
 # Console output
 from rich.console import Console 
