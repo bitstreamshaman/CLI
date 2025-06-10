@@ -264,7 +264,7 @@ def execute_control_command(command: str):
     cmd = command.lower().strip()
     
     if cmd == "exit":
-        console.print("\n👋 Thanks for using [bold #2B1BD1]Infraware CLI[/bold #2B1BD1] Goodbye!")
+        console.print(f"\n👋 Thanks for using [bold #2B1BD1]Infraware CLI[/bold #2B1BD1] Goodbye!")
         sys.exit(0)
 
     elif cmd == "clear":
@@ -393,7 +393,6 @@ def setup_logging(verbose=False):
     # Configure the strands logger specifically
     strands_logger = logging.getLogger("strands")
     strands_logger.setLevel(logging.DEBUG if verbose else logging.WARNING)
-
 
 def main():
     """Main entry point for the CLI application."""

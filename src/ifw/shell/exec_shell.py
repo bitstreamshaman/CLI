@@ -51,12 +51,22 @@ class ShellExecutor:
             # Reset alternate screen tracking for this command
             self.used_alternate_screen = False
             
+            # Ensure we start from the correct directory
+            self._sync_directory_state()
+            
             # Handle special built-in commands that need state management
             if self._handle_builtin_command(command):
+                # After handling cd, make sure Python is in the right place
+                self._sync_directory_state()
                 return self._get_builtin_output(command)
             
             # Execute with PTY
-            return self._execute_with_pty(command)
+            result = self._execute_with_pty(command)
+            
+            # Sync directory state after execution
+            self._sync_directory_state()
+            
+            return result
                 
         except Exception as e:
             return f"❌ Error executing command: {str(e)}"
@@ -340,9 +350,8 @@ class ShellExecutor:
     
     def _update_directory_state(self):
         """Try to detect if the working directory changed during command execution."""
-        # Since we're running commands in a subprocess, cd won't affect our parent
-        # We need to handle cd specially in _handle_builtin_command
-        pass
+        # After command execution, ensure Python process is in the right directory
+        self._sync_directory_state()
     
     def _handle_builtin_command(self, command: str) -> bool:
         """Handle commands that need special state management."""
@@ -367,14 +376,14 @@ class ShellExecutor:
                 
         except Exception as e:
             return f"❌ Error in builtin command: {str(e)}"
-    
+
     def _handle_cd_command(self, cmd_parts: list) -> str:
         """Handle cd command with proper state update."""
         if len(cmd_parts) == 1:
             new_dir = os.path.expanduser("~")
         else:
             target = cmd_parts[1]
-            
+
             if target == '-':
                 if hasattr(self, 'previous_dir'):
                     new_dir = self.previous_dir
@@ -386,12 +395,16 @@ class ShellExecutor:
                 new_dir = target
             else:
                 new_dir = os.path.join(self.current_dir, target)
-        
+
         try:
             resolved_path = os.path.abspath(new_dir)
             if os.path.isdir(resolved_path):
                 self.previous_dir = self.current_dir
                 self.current_dir = resolved_path
+
+                # ACTUALLY change the Python process's working directory
+                os.chdir(resolved_path)
+
                 # Update the environment variable
                 self.env_vars['PWD'] = resolved_path
                 return ""
@@ -429,3 +442,15 @@ class ShellExecutor:
         self.env_vars = os.environ.copy()
         self.shell_history = []
         self.output_buffer = []
+
+    def _sync_directory_state(self):
+        """Synchronize Python's working directory with tracked state."""
+        try:
+            current_actual = os.getcwd()
+            if current_actual != self.current_dir:
+                # Update both Python's working directory and our tracking
+                os.chdir(self.current_dir)
+        except Exception:
+            # If we can't change to tracked directory, update tracking to match reality
+            self.current_dir = os.getcwd()
+            self.env_vars['PWD'] = self.current_dir
