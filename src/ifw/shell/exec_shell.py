@@ -13,7 +13,7 @@ from typing import Optional, Callable
 import struct
 import fcntl
 
-class ShellExecutor:
+class ShellCommandExecutor:
     def __init__(self):
         # State persistence
         self.current_dir = os.getcwd()
