@@ -61,6 +61,8 @@ def create_config_file():
         # Create the config file
         with open(config_file, 'w') as f:
             f.write(f"ANTHROPIC_API_KEY={api_key}\n")
+            #Avoid using `tokenizers` before the fork 
+            f.write("TOKENIZERS_PARALLELISM='false'\n")
         
         # Set file permissions (read/write for owner only)
         config_file.chmod(0o600)
