@@ -8,6 +8,7 @@ from .user_id_manager import get_persistent_user_id
 import json
 import sys
 import io
+import logging
 
 # Initialize configuration
 force_faiss_config()
@@ -68,7 +69,7 @@ def store_memory(content: str) -> str:
 
     user_id = get_persistent_user_id()
 
-    print(user_id)
+    logging.debug(f"Storing memory for user {user_id} with content: {content}")
     
     def operation():
         agent = _get_memory_agent()
@@ -96,7 +97,7 @@ def recall_memory(query: str, max_results: int = 5) -> str:
     Retrieve relevant memories based on a search query without verbose output.
     """
     user_id = get_persistent_user_id()
-    print(user_id)
+    logging.debug(f"Recalling memory for user {user_id} with query: {query}")
     
     def operation():
         agent = _get_memory_agent()
