@@ -176,3 +176,4 @@ cython_debug/
 #Infraware
 output.txt
 count_rows.sh
+mem0_faiss_db/

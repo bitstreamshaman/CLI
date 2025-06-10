@@ -6,14 +6,6 @@ from rich import print as print_console
 from strands.models.anthropic import AnthropicModel
 
 
-def get_config_dir():
-    """Get the appropriate config directory for the current OS."""
-    if os.name == 'nt':  # Windows
-        return Path(os.environ.get('APPDATA', Path.home())) / 'ifw'
-    else:  # Linux/Mac
-        return Path(os.environ.get('XDG_CONFIG_HOME', Path.home() / '.config')) / 'ifw'
-
-
 def load_env_file(file_path):
     """Load environment variables from a file."""
     try:
@@ -29,19 +21,7 @@ def load_env_file(file_path):
 
 
 def get_api_key():
-    """Get API key from multiple sources in order of preference."""
-    
-    # 1. Environment variable (highest priority)
-    api_key = os.environ.get('ANTHROPIC_API_KEY')
-    if api_key:
-        return api_key
-    
-    # 2. Current directory .env (for development)
-    if Path('.env').exists():
-        load_dotenv('.env')
-        api_key = os.environ.get('ANTHROPIC_API_KEY')
-        if api_key:
-            return api_key
+    """Get API key from .ifw.env"""
     
     # 3. Home directory .ifw.env (user-specific config)
     home_env = Path.home() / '.ifw.env'
@@ -50,17 +30,7 @@ def get_api_key():
         api_key = os.environ.get('ANTHROPIC_API_KEY')
         if api_key:
             return api_key
-    
-    # 4. XDG config directory (system standard)
-    config_dir = get_config_dir()
-    config_env = config_dir / 'config.env'
-    if config_env.exists():
-        load_env_file(config_env)
-        api_key = os.environ.get('ANTHROPIC_API_KEY')
-        if api_key:
-            return api_key
-    
-    return None
+
 
 
 def create_config_file():

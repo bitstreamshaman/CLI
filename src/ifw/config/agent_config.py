@@ -152,7 +152,13 @@ def create_orchestrator_agent():
     This function initializes the agent with the system prompt and callback handler.
     """
     return Agent(
-        tools=[use_gcp, use_aws, use_azure, use_docker, shell, use_memory],
+        tools=[
+            use_gcp, 
+            use_aws, 
+            use_azure, 
+            use_docker, 
+            shell, 
+            use_memory],
         model=get_model(),
         callback_handler=CustomCallbackHandler(),
         system_prompt=SYSTEM_PROMPT

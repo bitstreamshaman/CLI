@@ -4,6 +4,7 @@ from strands.agent import Agent
 from strands import tool
 from strands_tools import mem0_memory
 from ...utils.model import get_model
+from .user_id_manager import get_persistent_user_id
 import json
 import sys
 import io
@@ -53,25 +54,29 @@ def _silent_memory_operation(operation_func):
         sys.stderr = old_stderr
 
 @tool
-def store_memory(content: str, user_id: str = "default_user") -> str:
+def store_memory(content: str) -> str:
     """
     Store important information in persistent memory silently.
     
     Args:
         content: The information to store in memory
-        user_id: Unique identifier for the user (defaults to "default_user")
         
     Returns:
         Simple success/failure message without verbose output
     """
+    # Use persistent user ID 
+
+    user_id = get_persistent_user_id()
+
+    print(user_id)
+    
     def operation():
         agent = _get_memory_agent()
         return agent.tool.mem0_memory(
             action="store",
             content=content,
-            user_id=user_id
+            user_id=user_id  
         )
-    
     try:
         result = _silent_memory_operation(operation)
         
@@ -86,18 +91,13 @@ def store_memory(content: str, user_id: str = "default_user") -> str:
         return "error"
 
 @tool
-def recall_memory(query: str, user_id: str = "default_user", max_results: int = 5) -> str:
+def recall_memory(query: str, max_results: int = 5) -> str:  
     """
     Retrieve relevant memories based on a search query without verbose output.
-    
-    Args:
-        query: What to search for in stored memories
-        user_id: Unique identifier for the user (defaults to "default_user")
-        max_results: Maximum number of memories to return (default: 5)
-        
-    Returns:
-        Clean formatted list of relevant memories
     """
+    user_id = get_persistent_user_id()
+    print(user_id)
+    
     def operation():
         agent = _get_memory_agent()
         return agent.tool.mem0_memory(
@@ -114,19 +114,23 @@ def recall_memory(query: str, user_id: str = "default_user", max_results: int = 
             try:
                 memories_data = json.loads(content_text)
 
-                # Filter and sort memories (FAISS uses lower scores = better relevance)
+                # Much more permissive filtering
                 filtered_memories = []
                 for mem in memories_data:
                     score = mem.get('score', float('inf'))
-                    if score <= 0.5:  # Reasonable threshold for relevance
+                    if score <= 2.0:  # Very permissive threshold
                         filtered_memories.append(mem)
+
+                # If no results with 2.0, show everything
+                if not filtered_memories:
+                    filtered_memories = memories_data
 
                 # Sort by score (lower is better in FAISS)
                 sorted_memories = sorted(filtered_memories, key=lambda x: x.get('score', float('inf')))
                 top_memories = sorted_memories[:max_results]
 
                 if not top_memories:
-                    return f"No relevant memories found for: '{query}'"
+                    return f"No memories found for: '{query}'"
 
                 # Format memories cleanly
                 formatted_memories = []
@@ -145,25 +149,28 @@ def recall_memory(query: str, user_id: str = "default_user", max_results: int = 
         return f"Error retrieving memories: {str(e)}"
 
 @tool
-def generate_memory_response(query: str, user_id: str = "default_user") -> str:
+def generate_memory_response(query: str) -> str:
     """
     Generate a contextual response using stored memories as background knowledge quietly.
     
     Args:
         query: The user's question or request
-        user_id: Unique identifier for the user (defaults to "default_user")
+        user_id: Unique identifier for the user (if None, uses persistent user ID)
         
     Returns:
         AI-generated response enhanced with relevant stored memories
     """
+    # Use persistent user ID 
+    
+    user_id = get_persistent_user_id()
+    
     def retrieve_operation():
         agent = _get_memory_agent()
         return agent.tool.mem0_memory(
             action="retrieve",
             query=query,
-            user_id=user_id
+            user_id=user_id  
         )
-    
     try:
         # First, retrieve relevant memories quietly
         result = _silent_memory_operation(retrieve_operation)
@@ -227,22 +234,26 @@ Use the provided memories to create a natural, conversational response to the us
         return f"Error generating memory-enhanced response: {str(e)}"
 
 @tool
-def list_recent_memories(user_id: str = "default_user", limit: int = 10) -> str:
+def list_recent_memories(limit: int = 10) -> str:
     """
     List recent memories for review without verbose output.
     
     Args:
-        user_id: Unique identifier for the user (defaults to "default_user")
+        user_id: Unique identifier for the user (if None, uses persistent user ID)
         limit: Maximum number of recent memories to show (default: 10)
         
     Returns:
         Clean formatted list of recent memories
     """
+    # Use persistent user ID 
+    
+    user_id = get_persistent_user_id()
+    
     def operation():
         agent = _get_memory_agent()
         return agent.tool.mem0_memory(
             action="list",
-            user_id=user_id
+            user_id=user_id  
         )
     
     try:
