@@ -156,11 +156,7 @@ class CLIController:
         """
         try:
             # Process command through command processor
-            success = self.command_processor.process_command(user_input)
-            
-            # Handle unsuccessful command execution
-            if not success:
-                self.console.print("[yellow]⚠️  Command execution was not successful[/yellow]")
+            self.command_processor.process_command(user_input)
                 
         except CommandProcessingError as e:
             # Handle command processing errors

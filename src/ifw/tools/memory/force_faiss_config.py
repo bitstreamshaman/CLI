@@ -36,7 +36,7 @@ def force_faiss_config():
                     "provider": "faiss",
                     "config": {
                         "embedding_model_dims": 384,
-                        "path": "/tmp/mem0_faiss_db"
+                        "path": "./mem0_faiss_db"
                     }
                 }
             }
