@@ -48,6 +48,12 @@ pip install pipx
 pipx install git+https://github.com/Infraware-dev/CLI.git
 ```
 
+## 🔑 API Key Setup
+
+To use Infraware CLI, you'll need an **Anthropic API key**. You can get one from the [Anthropic Console](https://console.anthropic.com/).
+
+**Note:** Additional AI providers are coming soon! Stay tuned for more options.
+
 ## 🚀 Quick Start
 
 Once installed, launch the Infraware CLI:
