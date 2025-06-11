@@ -24,7 +24,7 @@ def get_api_key():
     """Get API key from .ifw.env"""
     
     # 3. Home directory .ifw.env (user-specific config)
-    home_env = Path.home() / '.ifw.env'
+    home_env = Path.home() / '~/.ifw/.ifw.env'
     if home_env.exists():
         load_env_file(home_env)
         api_key = os.environ.get('ANTHROPIC_API_KEY')
