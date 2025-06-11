@@ -4,6 +4,7 @@ def force_faiss_config():
     
     # Import mem0 first to patch it
     from mem0 import Memory as Mem0Memory
+    from pathlib import Path
     
     # Store original from_config method
     original_from_config = Mem0Memory.from_config
@@ -15,6 +16,10 @@ def force_faiss_config():
         # If it's a FAISS config, override with our HuggingFace config
         if (config_dict and 
             config_dict.get("vector_store", {}).get("provider") == "faiss"):
+            
+            # Ensure .ifw directory exists
+            ifw_dir = Path.home() / '.ifw'
+            ifw_dir.mkdir(mode=0o700, exist_ok=True)
             
             faiss_config = {
                 "embedder": {
@@ -36,7 +41,7 @@ def force_faiss_config():
                     "provider": "faiss",
                     "config": {
                         "embedding_model_dims": 384,
-                        "path": "~/.ifw/mem0_faiss_db"
+                        "path": str(Path.home() / '.ifw' / 'mem0_faiss_db')
                     }
                 }
             }
