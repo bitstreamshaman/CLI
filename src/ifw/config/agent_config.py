@@ -13,6 +13,7 @@ from ..tools.cloud.use_azure import use_azure
 from ..tools.containers.use_docker import use_docker
 from ..utils.banner import print_banner
 from ..utils.callback_handler import CustomCallbackHandler
+from strands.agent.conversation_manager import SlidingWindowConversationManager
 
 SYSTEM_PROMPT = """
 You are Infraware Cloud Assistant, an expert AI cloud operations assistant specializing in multi-cloud environments with advanced persistent memory capabilities.
@@ -149,8 +150,15 @@ This disclosure requirement exists for transparency, security, and audit purpose
 def create_orchestrator_agent():
     """
     Create and return the orchestrator agent with all necessary tools and configurations.
-    This function initializes the agent with the system prompt and callback handler.
+    This function initializes the agent with the system prompt, context window and callback handler.
     """
+
+    # Create a conversation manager with custom window size
+    conversation_manager = SlidingWindowConversationManager(
+        window_size=20,  # Maximum number of messages to keep
+    )
+
+
     return Agent(
         tools=[
             use_gcp, 
@@ -160,6 +168,7 @@ def create_orchestrator_agent():
             shell, 
             use_memory],
         model=get_model(),
+        conversation_manager=conversation_manager,
         callback_handler=CustomCallbackHandler(),
         system_prompt=SYSTEM_PROMPT
     )
