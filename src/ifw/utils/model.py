@@ -32,10 +32,11 @@ def get_api_key():
             return api_key
 
 
-
 def create_config_file():
     """Interactively create the API key config file."""
-    config_file = Path.home() / '.ifw.env'
+    # Create .ifw directory in user home
+    config_dir = Path.home() / '.ifw'
+    config_file = config_dir / '.ifw.env'
     
     # Show setup message
     setup_message = Panel(
@@ -58,10 +59,13 @@ def create_config_file():
             print_console("[red]❌ No API key provided. Setup cancelled.[/red]")
             return None
         
+        # Create the .ifw directory if it doesn't exist
+        config_dir.mkdir(mode=0o700, exist_ok=True)
+        
         # Create the config file
         with open(config_file, 'w') as f:
             f.write(f"ANTHROPIC_API_KEY={api_key}\n")
-            #Avoid using `tokenizers` before the fork 
+            # Avoid using `tokenizers` before the fork 
             f.write("TOKENIZERS_PARALLELISM='false'\n")
         
         # Set file permissions (read/write for owner only)
@@ -88,7 +92,6 @@ def create_config_file():
     except Exception as e:
         print_console(f"[red]❌ Error creating config file: {e}[/red]")
         return None
-
 
 def prompt_for_setup():
     """Ask user if they want to create a config file."""
