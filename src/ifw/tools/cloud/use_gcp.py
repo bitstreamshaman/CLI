@@ -4,42 +4,23 @@ Main GCP operations tool using dynamic tool discovery and MCP integration.
 
 from strands import Agent, tool
 from strands_tools import shell
-from ....utils.model import get_model
+from ifw.utils.model import get_model 
+from strands.tools.mcp import MCPClient
+from mcp import stdio_client, StdioServerParameters
+from strands.tools.decorator import tool
+from ifw.utils.callback_handler import CustomCallbackHandler
 
-# Import all tools from each module
-from .tools.projects import *
-from .tools.billing import *
-from .tools.kubernetes import *
-from .tools.sql import *
-from .tools.logging import *
-
-import inspect
-
-@tool
-def use_gcp(prompt: str):
-    """
-    Tool Usage: Comprehensive GCP operations using specialized MCP tools and gcloud CLI commands.
-    
-    This tool provides access to GCP operations through a combination of specialized MCP tools
-    and gcloud CLI commands via the shell tool. For any operations not covered by the MCP tools,
-    it defaults to using gcloud CLI commands.
-    """
-    
-    # Get all functions from current module - they're all @tool functions
-    current_module = inspect.getmembers(inspect.getmodule(inspect.currentframe()))
-    
-    gcp_tools = []
-    for name, obj in current_module:
-        if callable(obj) and hasattr(obj, '__name__') and name != 'use_gcp':
-            gcp_tools.append(obj)
-    
-    system_prompt = """
-    You are a helpful GCP operations assistant with access to specialized GCP MCP tools and gcloud CLI commands.
+SYSTEM_PROMPT = """
+   You are a helpful GCP operations assistant with access to specialized GCP MCP tools and gcloud CLI commands.
     
     AVAILABLE SPECIALIZED MCP TOOLS (use these when applicable):
     - All dynamically discovered GCP MCP tools are available as functions
     - These tools cover GCP projects, billing, compute, Kubernetes, SQL, storage, logging, functions, App Engine, and IAM
     - Use these tools first before falling back to gcloud CLI commands
+    
+    AVAILABLE SHELL TOOL:
+    - shell: Execute any command line operations including gcloud CLI commands
+    - Use this for gcloud commands not covered by specialized MCP tools
     
     EXECUTION STRATEGY:
     1. First, check if the requested operation can be handled by one of the specialized MCP tools
@@ -114,16 +95,39 @@ def use_gcp(prompt: str):
 
     I will execute the following command in the terminal: gcloud compute networks subnets list 
     """
-    
-    # Create agent with dynamically discovered tools
-    agent = Agent(
-        model=get_model(),
-        system_prompt=system_prompt,
-        tools=[
-            *gcp_tools,  # All discovered GCP MCP tools
-            shell,       # Shell tool for gcloud CLI commands
-        ]
-    )
 
-    result = agent(prompt)
-    return result
+@tool
+def use_gcp(prompt: str) -> str:
+    """
+    Tool Usage: Comprehensive GCP operations using specialized MCP tools and gcloud CLI commands.
+    
+    This tool provides access to GCP operations through a combination of specialized MCP tools
+    and gcloud CLI commands via the shell tool. For any operations not covered by the MCP tools,
+    it defaults to using gcloud CLI commands.
+
+    Args:
+        prompt (str): The user query or command to execute.
+
+    """
+    mcp_client = MCPClient(lambda: stdio_client(
+        StdioServerParameters(command="npx", args=["-y", "gcp-mcp"])
+    ))
+
+    model = get_model()
+
+    with mcp_client:
+        # Get the tools from the MCP server
+        mcp_tools = mcp_client.list_tools_sync()
+        
+        # Combine MCP tools with the external shell tool
+        all_tools = mcp_tools + [shell]
+
+        # Create an agent with both MCP tools and shell tool
+        agent = Agent(
+            tools=all_tools,
+            system_prompt=SYSTEM_PROMPT,
+            model=model,
+            callback_handler=CustomCallbackHandler()
+        )
+        
+        agent(prompt)

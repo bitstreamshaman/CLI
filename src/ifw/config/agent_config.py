@@ -8,7 +8,7 @@ from strands_tools import use_aws, shell
 from ..tools.memory import use_memory
 # Internal Modules
 from ..utils.model import get_model
-from ..tools.cloud.use_gcp import use_gcp
+from ..tools.cloud import use_gcp
 from ..tools.cloud.use_azure import use_azure
 from ..tools.containers.use_docker import use_docker
 from ..utils.banner import print_banner
