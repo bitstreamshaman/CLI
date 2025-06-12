@@ -1,39 +1,16 @@
-# System imports
+"""
+Main Azure operations tool using dynamic tool discovery and MCP integration.
+"""
+
 from strands import Agent, tool
 from strands_tools import shell
-from ....utils.model import get_model
-import inspect
+from ifw.utils.model import get_model 
+from strands.tools.mcp import MCPClient
+from mcp import stdio_client, StdioServerParameters
+from strands.tools.decorator import tool
+from ifw.utils.callback_handler import CustomCallbackHandler
 
-
-# Azure MCP Tools 
-from .tools.subscription import *
-from .tools.storage import *
-from .tools.cosmosdb import *
-from .tools.search import *
-from .tools.kusto import *
-from .tools.keyvault import *
-from .tools.postgres import *
-from .tools.app_config import *
-from .tools.monitor import *
-from .tools.servicebus import *
-from .tools.redis import *
-from .tools.extensions import *
-from .tools.best_practices import *
-
-
-@tool  
-def use_azure(prompt: str):
-    # Get all functions from current module - they're all @tool functions
-    current_module = inspect.getmembers(inspect.getmodule(inspect.currentframe()))
-    
-    azure_tools = []
-
-    print(azure_tools)
-    for name, obj in current_module:
-        if callable(obj) and hasattr(obj, '__name__') and name != 'use_azure':
-            azure_tools.append(obj)
-    
-    system_prompt ="""
+SYSTEM_PROMPT="""
 You are a helpful Azure operations assistant with access to specialized Azure MCP tools and Azure CLI commands.
 
 AVAILABLE SPECIALIZED AZURE MCP TOOLS (use these when applicable):
@@ -154,15 +131,39 @@ EXAMPLE:
 
 I will execute the following command in the terminal: az vm list --resource-group myResourceGroup --output table
 """
-    
-    agent = Agent(
-        model=get_model(),
-        system_prompt=system_prompt,
-        tools=[
-            *azure_tools,  # All imported tool functions
-            shell,
-        ]
-    )
-    
-    return agent(prompt)
 
+@tool
+def use_azure(prompt: str) -> str:
+    """
+    Tool Usage: Comprehensive Azure operations using specialized MCP tools and az CLI commands.
+    
+    This tool provides access to Azure operations through a combination of specialized MCP tools
+    and az CLI commands via the shell tool. For any operations not covered by the MCP tools,
+    it defaults to using gcloud CLI commands.
+
+    Args:
+        prompt (str): The user query or command to execute.
+
+    """
+    mcp_client = MCPClient(lambda: stdio_client(
+        StdioServerParameters(command="npx", args=["-y", "@azure/mcp@latest", "server", "start"])
+    ))
+
+    model = get_model()
+
+    with mcp_client:
+        # Get the tools from the MCP server
+        mcp_tools = mcp_client.list_tools_sync()
+        
+        # Combine MCP tools with the external shell tool
+        all_tools = mcp_tools + [shell]
+
+        # Create an agent with both MCP tools and shell tool
+        agent = Agent(
+            tools=all_tools,
+            system_prompt=SYSTEM_PROMPT,
+            model=model,
+            callback_handler=CustomCallbackHandler()
+        )
+        
+        agent(prompt)
