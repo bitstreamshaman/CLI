@@ -11,7 +11,6 @@ from ..utils.model import get_model
 from ..tools.cloud import use_gcp
 from ..tools.cloud import use_azure
 from ..tools.containers.use_docker import use_docker
-from ..utils.banner import print_banner
 from ..utils.callback_handler import CustomCallbackHandler
 from strands.agent.conversation_manager import SlidingWindowConversationManager
 
