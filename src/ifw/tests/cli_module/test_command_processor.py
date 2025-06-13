@@ -2,19 +2,15 @@
 """
 Unit tests for CommandProcessor using proper unittest framework and Mock.
 """
+
+# Import the components to test
+from ifw.cli.command_processor import CommandProcessor, CommandProcessingError, NoHandlerFoundError
+
 import sys
-import os
 import unittest
 from unittest.mock import Mock
 from rich.console import Console
 
-# Add current directory to Python path to enable imports
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
-
-# Import the components to test
-from ifw.cli.command_processor import CommandProcessor, CommandProcessingError, NoHandlerFoundError
 
 
 class TestCommandProcessor(unittest.TestCase):
@@ -461,7 +457,7 @@ def run_tests():
     
     # Print summary
     print(f"\n{'='*60}")
-    print(f"🧪 Test Summary:")
+    print("🧪 Test Summary:")
     print(f"Tests run: {result.testsRun}")
     print(f"Failures: {len(result.failures)}")
     print(f"Errors: {len(result.errors)}")
@@ -471,19 +467,19 @@ def run_tests():
         print(f"Success rate: {success_rate:.1f}%")
     
     if result.failures:
-        print(f"\n❌ Failures:")
+        print("\n❌ Failures:")
         for test, traceback in result.failures:
             print(f"  {test}: {traceback}")
     
     if result.errors:
-        print(f"\n🚨 Errors:")
+        print("\n🚨 Errors:")
         for test, traceback in result.errors:
             print(f"  {test}: {traceback}")
     
     if result.wasSuccessful():
-        print(f"\n✅ All tests passed!")
+        print("\n✅ All tests passed!")
     else:
-        print(f"\n⚠️  Some tests failed!")
+        print("\n⚠️  Some tests failed!")
     
     return result.wasSuccessful()
 

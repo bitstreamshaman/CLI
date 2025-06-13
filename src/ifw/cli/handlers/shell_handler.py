@@ -2,7 +2,9 @@
 Shell Command Handler for Infraware Cloud Assistant.
 Processes and executes shell commands.
 """
+
 from .base_handler import BaseHandler
+
 
 class ShellCommandHandler(BaseHandler):
     def __init__(self, agent, executor, detector, console):
@@ -10,7 +12,7 @@ class ShellCommandHandler(BaseHandler):
         self.executor = executor
         self.agent = agent
         self.console = console
-    
+
     def can_handle(self, user_input: str) -> bool:
         """Detect if input is a traditional shell command."""
         return self.detector.is_shell_command(user_input)
@@ -36,14 +38,11 @@ class ShellCommandHandler(BaseHandler):
                 success = True
 
             # Add shell command to conversation history in the correct format
-            shell_command_message = {
-                'role': 'user', 
-                'content': [{'text': user_input}]
-            }
+            shell_command_message = {"role": "user", "content": [{"text": user_input}]}
 
             shell_result_message = {
-                'role': 'assistant', 
-                'content': [{'text': history_output}]
+                "role": "assistant",
+                "content": [{"text": history_output}],
             }
 
             # Add to agent's conversation history
@@ -51,7 +50,7 @@ class ShellCommandHandler(BaseHandler):
             self.agent.messages.append(shell_result_message)
 
             return success
-            
+
         except Exception as e:
             self.console.print(f"❌ Error executing command: {e}")
             return False

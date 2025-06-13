@@ -1,12 +1,13 @@
 """This module provides the implementation for the retrieving completion results
 from bash.
 
-A Special thanks to the xonsh team for their work on the 
+A Special thanks to the xonsh team for their work on the
 xonsh shell from which i took this code, go check them out at: https://github.com/xonsh/xonsh.git
 """
 
 # developer note: this file should not perform any action on import.
 # This is to allow users who want to use this completion file as a standalone CLI tool.
+import typing as tp
 import functools
 import os
 import pathlib
@@ -16,7 +17,7 @@ import shlex
 import shutil
 import subprocess
 import sys
-import typing as tp
+
 
 __version__ = "0.2.8"
 
@@ -281,6 +282,7 @@ do
 done
 """
 
+
 def bash_completions(
     prefix,
     line,
@@ -364,21 +366,21 @@ def bash_completions(
             # Convert to list for commonprefix
             out_list = list(out)
             commprefix = os.path.commonprefix(out_list)
-            
+
             # If there's a meaningful common prefix, return just that
             if commprefix and len(commprefix) > 0:
                 # Check if all completions start with the same prefix
                 if all(completion.startswith(commprefix) for completion in out):
                     # For cases like hostname where all options start with '--'
                     # Return the common prefix so bash can complete it
-                    if commprefix.startswith('--'):
+                    if commprefix.startswith("--"):
                         return {commprefix}, 0
-                    elif commprefix.startswith('-'):
+                    elif commprefix.startswith("-"):
                         # If common prefix is just '-', let bash complete step by step
-                        return {'-'}, 0
-            
+                        return {"-"}, 0
+
         # If no meaningful common prefix, fall through to normal processing
-    
+
     # Normal processing for non-empty prefixes
     commprefix = os.path.commonprefix(list(out)) if out else ""
 
@@ -390,10 +392,10 @@ def bash_completions(
     # Calculate strip length more carefully
     strip_len = 0
     strip_prefix = prefix.strip("\"'")
-    
+
     # Handle the case where prefix is shorter than common prefix
     min_len = min(len(strip_prefix), len(commprefix))
-    
+
     # Find where the prefix diverges from the common prefix
     for i in range(min_len):
         if commprefix[i] != strip_prefix[i]:
@@ -415,43 +417,6 @@ def bash_completions(
         strip_len = prefix.index(":") + 1
 
     return out, max(len(prefix) - strip_len, 0)
-
-def bash_complete_line(line, return_line=True, **kwargs):
-    """Provides the completion from the end of the line.
-
-    Parameters
-    ----------
-    line : str
-        Line to complete
-    return_line : bool, optional
-        If true (default), will return the entire line, with the completion added.
-        If false, this will instead return the strings to append to the original line.
-    kwargs : optional
-        All other keyword arguments are passed to the bash_completions() function.
-
-    Returns
-    -------
-    rtn : set of str
-        Possible completions of prefix
-    """
-    # set up for completing from the end of the line
-    split = line.split()
-    if len(split) > 1 and not line.endswith(" "):
-        prefix = split[-1]
-        begidx = len(line.rsplit(prefix)[0])
-    else:
-        prefix = ""
-        begidx = len(line)
-    endidx = len(line)
-    # get completions
-    out, lprefix = bash_completions(prefix, line, begidx, endidx, **kwargs)
-    # reformat output
-    if return_line:
-        preline = line[:-lprefix]
-        rtn = {preline + o for o in out}
-    else:
-        rtn = {o[lprefix:] for o in out}
-    return rtn
 
 
 def _bc_main(args=None):
@@ -485,19 +450,6 @@ if __name__ == "__main__":
 from bash.
 """
 
-# developer note: this file should not perform any action on import.
-# This is to allow users who want to use this completion file as a standalone CLI tool.
-import functools
-import os
-import pathlib
-import platform
-import re
-import shlex
-import shutil
-import subprocess
-import sys
-import typing as tp
-
 __version__ = "0.2.8"
 
 
@@ -760,142 +712,6 @@ do
     fi
 done
 """
-
-def bash_completions(
-    prefix,
-    line,
-    begidx,
-    endidx,
-    env=None,
-    paths=None,
-    command=None,
-    quote_paths=_bash_quote_paths,
-    line_args=None,
-    opening_quote="",
-    closing_quote="",
-    arg_index=None,
-    **kwargs,
-):
-    """Completes based on results from BASH completion - FIXED VERSION"""
-    source = _get_bash_completions_source(paths) or ""
-
-    if prefix.startswith("$"):  # do not complete env variables
-        return set(), 0
-
-    splt = line_args or line.split()
-    cmd = splt[0]
-    cmd = os.path.basename(cmd)
-    prev = ""
-    if arg_index is not None:
-        n = arg_index
-        if arg_index > 0:
-            prev = splt[arg_index - 1]
-    else:
-        # find `n` and `prev` by ourselves
-        idx = n = 0
-        for n, tok in enumerate(splt):  # noqa
-            if tok == prefix:
-                idx = line.find(prefix, idx)
-                if idx >= begidx:
-                    break
-            prev = tok
-        if len(prefix) == 0:
-            n += 1
-    prefix_quoted = shlex.quote(prefix)
-
-    script = BASH_COMPLETE_SCRIPT.format(
-        source=source,
-        line=" ".join(shlex.quote(p) for p in splt if p),
-        comp_line=shlex.quote(line),
-        n=n,
-        cmd=shlex.quote(cmd),
-        end=endidx + 1,
-        prefix=prefix_quoted,
-        prev=shlex.quote(prev),
-    )
-
-    if command is None:
-        command = _bash_command(env=env)
-    try:
-        out = subprocess.check_output(
-            [command, "-c", script],
-            universal_newlines=True,
-            stderr=subprocess.PIPE,
-            env=env,
-        )
-        out = [line for line in out.splitlines() if line.strip()]
-        if not out:
-            raise ValueError
-    except (
-        subprocess.CalledProcessError,
-        FileNotFoundError,
-        UnicodeDecodeError,
-        ValueError,
-    ):
-        return set(), 0
-
-    complete_stmt = out[0]
-    out = set(out[1:])
-
-    # Handle empty prefix specially - mimic native bash behavior
-    if not prefix:
-        # Find the longest common prefix among all completions
-        if out:
-            # Convert to list for commonprefix
-            out_list = list(out)
-            commprefix = os.path.commonprefix(out_list)
-            
-            # If there's a meaningful common prefix, return just that
-            if commprefix and len(commprefix) > 0:
-                # Check if all completions start with the same prefix
-                if all(completion.startswith(commprefix) for completion in out):
-                    # For cases like hostname where all options start with '--'
-                    # Return the common prefix so bash can complete it
-                    if commprefix.startswith('--'):
-                        return {commprefix}, 0
-                    elif commprefix.startswith('-'):
-                        # If common prefix is just '-', let bash complete step by step
-                        return {'-'}, 0
-            
-        # If no meaningful common prefix, fall through to normal processing
-    
-    # Normal processing for non-empty prefixes
-    commprefix = os.path.commonprefix(list(out)) if out else ""
-
-    if prefix.startswith("~") and commprefix and prefix not in commprefix:
-        home_ = os.path.expanduser("~")
-        out = {f"~/{os.path.relpath(p, home_)}" for p in out}
-        commprefix = f"~/{os.path.relpath(commprefix, home_)}"
-
-    # Calculate strip length more carefully
-    strip_len = 0
-    strip_prefix = prefix.strip("\"'")
-    
-    # Handle the case where prefix is shorter than common prefix
-    min_len = min(len(strip_prefix), len(commprefix))
-    
-    # Find where the prefix diverges from the common prefix
-    for i in range(min_len):
-        if commprefix[i] != strip_prefix[i]:
-            strip_len = i
-            break
-    else:
-        # If we went through the whole loop, the prefix matches the common prefix
-        strip_len = min_len
-
-    if "-o noquote" not in complete_stmt:
-        out, need_quotes = quote_paths(out, opening_quote, closing_quote)
-    if "-o nospace" in complete_stmt:
-        out = {x.rstrip() for x in out}
-
-    # Handle special cases for arguments with separators
-    if "=" in prefix and "=" not in commprefix:
-        strip_len = prefix.index("=") + 1
-    elif ":" in prefix and ":" not in commprefix:
-        strip_len = prefix.index(":") + 1
-
-    return out, max(len(prefix) - strip_len, 0)
-
 def bash_complete_line(line, return_line=True, **kwargs):
     """Provides the completion from the end of the line.
 
@@ -957,5 +773,3 @@ def _bc_main(args=None):
     out = bash_complete_line(ns.line, return_line=ns.return_line)
     for o in sorted(out):
         print(o)
-
-
