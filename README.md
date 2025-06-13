@@ -89,17 +89,17 @@ You'll be greeted with an interactive terminal where you can:
 
 ### Natural Language Commands
 ```bash
-|>| user@hostname:~ List all my GCP projects
-|>| user@hostname:~ Show me AWS EC2 instances in us-east-1
-|>| user@hostname:~ Check my cloud costs for this month
-|>| user@hostname:~ Create a new Docker container for my web app
+|>| user@hostname List all my GCP projects
+|>| user@hostname Show me AWS EC2 instances in us-east-1
+|>| user@hostname Check my cloud costs for this month
+|>| user@hostname Create a new Docker container for my web app
 ```
 
 ### Direct Shell Commands
 ```bash
-|>| user@hostname:~ ls -la
-|>| user@hostname:~ cd /path/to/project
-|>| user@hostname:~ kubectl get pods
+|>| user@hostname ls -la
+|>| user@hostname cd /path/to/project
+|>| user@hostname kubectl get pods
 ```
 
 ### Control Commands
