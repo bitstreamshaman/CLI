@@ -196,7 +196,14 @@ Show me cost trends for the last 6 months
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+We welcome contributions from the community! Our detailed contributing guidelines are currently being finalized and will be available soon at [CONTRIBUTING.md](CONTRIBUTING.md).
+
+In the meantime, feel free to:
+- Open issues to report bugs or suggest features
+- Submit pull requests with clear descriptions of your changes
+- Join discussions in existing issues
+
+For questions about contributing, please open an issue and we'll be happy to help guide you.
 
 ## 📄 License
 
