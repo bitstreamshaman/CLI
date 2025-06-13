@@ -19,34 +19,57 @@ Infraware CLI is an intelligent command-line interface that combines the power o
 - Cost optimization suggestions
 - Automated troubleshooting assistance
 
-### 💻 Enhanced Terminal Experience
-- **Smart Command Completion** - Context-aware autocompletion
+### 💻 Terminal Experience
+- **Command Completion** - Standard bash autocompletion
 - **Command History** - Persistent history with reverse search (Ctrl+R)
 - **Shell Integration** - Execute shell commands alongside AI operations
 - **Interactive Prompts** - Rich, colorful terminal interface
 
-### 🛠️ Core Capabilities
-- **Infrastructure Management** - Create, modify, and monitor cloud resources
-- **Cost Analysis** - Track and optimize cloud spending across platforms
-- **Security & IAM** - Manage permissions and access controls
-- **Monitoring & Alerts** - Set up and manage cloud monitoring
-- **Container Operations** - Docker and Kubernetes management
-- **Multi-cloud Strategy** - Best practices for hybrid cloud deployments
+### 🧠 Contextual Memory
+- **Environment Awareness** - Remembers your cloud configurations and preferences
+- **Infrastructure Intelligence** - Learns your deployment patterns and resource usage
+- **Adaptive Reliability** - Improves accuracy and suggestions over time
+- **Context Retention** - Maintains awareness of your current project state and history
+- **Personalized Workflows** - Tailors recommendations based on your usage patterns
+
 
 ## 📦 Installation
 
 ### Prerequisites
-Make sure you have `pipx` installed on your system:
+
+Before installing the Infraware CLI, ensure you have `pipx` installed on your system:
 
 ```bash
 # Install pipx if you haven't already
 pip install pipx
+
+# Ensure pipx is in your PATH
+pipx ensurepath
 ```
 
+> **Note for Windows users** : This CLI has been tested on Linux systems. For Windows installation, please use Windows Subsystem for Linux (WSL).
+
+
 ### Install Infraware CLI
+
 ```bash
 pipx install git+https://github.com/Infraware-dev/CLI.git
 ```
+
+### Verify Installation
+
+After installation, verify that the CLI is working correctly:
+
+```bash
+ifw
+```
+
+### Troubleshooting
+
+If you encounter issues during installation:
+
+- **Path issues**: Restart your terminal or run `source ~/.bashrc` (or equivalent for your shell) after running `pipx ensurepath`
+- **Permission errors**: Ensure you have the necessary permissions to install packages
 
 ## 🔑 API Key Setup
 
@@ -66,22 +89,20 @@ You'll be greeted with an interactive terminal where you can:
 
 ### Natural Language Commands
 ```bash
-|>| user@hostname:~ List all my GCP projects
-|>| user@hostname:~ Show me AWS EC2 instances in us-east-1
-|>| user@hostname:~ Check my cloud costs for this month
-|>| user@hostname:~ Create a new Docker container for my web app
+|>| user@hostname List all my GCP projects
+|>| user@hostname Show me AWS EC2 instances in us-east-1
+|>| user@hostname Check my cloud costs for this month
+|>| user@hostname Create a new Docker container for my web app
 ```
 
 ### Direct Shell Commands
 ```bash
-|>| user@hostname:~ ls -la
-|>| user@hostname:~ cd /path/to/project
-|>| user@hostname:~ kubectl get pods
+|>| user@hostname ls -la
+|>| user@hostname cd /path/to/project
+|>| user@hostname kubectl get pods
 ```
 
 ### Control Commands
-- `clear` - Clear the terminal screen
-- `reset` - Reset shell state to initial directory
 - `exit` - Exit the CLI
 
 ## 💡 Example Use Cases
@@ -175,11 +196,18 @@ Show me cost trends for the last 6 months
 
 ## 🤝 Contributing
 
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+We welcome contributions from the community! Our detailed contributing guidelines are currently being finalized and will be available soon at [CONTRIBUTING.md](CONTRIBUTING.md).
+
+In the meantime, feel free to:
+- Open issues to report bugs or suggest features
+- Submit pull requests with clear descriptions of your changes
+- Join discussions in existing issues
+
+For questions about contributing, please open an issue and we'll be happy to help guide you.
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache-2.0 License - see the [LICENSE](LICENSE) file for details.
 
 ## 🆘 Support (WIP)
 
