@@ -4,13 +4,12 @@ Main Azure operations tool using dynamic tool discovery and MCP integration.
 
 from strands import Agent, tool
 from strands_tools import shell
-from ifw.utils.model import get_model 
+from ifw.utils.model import get_model
 from strands.tools.mcp import MCPClient
 from mcp import stdio_client, StdioServerParameters
-from strands.tools.decorator import tool
 from ifw.utils.callback_handler import CustomCallbackHandler
 
-SYSTEM_PROMPT="""
+SYSTEM_PROMPT = """
 You are a helpful Azure operations assistant with access to specialized Azure MCP tools and Azure CLI commands.
 
 AVAILABLE SPECIALIZED AZURE MCP TOOLS (use these when applicable):
@@ -132,11 +131,12 @@ EXAMPLE:
 I will execute the following command in the terminal: az vm list --resource-group myResourceGroup --output table
 """
 
+
 @tool
 def use_azure(prompt: str) -> str:
     """
     Tool Usage: Comprehensive Azure operations using specialized MCP tools and az CLI commands.
-    
+
     This tool provides access to Azure operations through a combination of specialized MCP tools
     and az CLI commands via the shell tool. For any operations not covered by the MCP tools,
     it defaults to using gcloud CLI commands.
@@ -145,16 +145,20 @@ def use_azure(prompt: str) -> str:
         prompt (str): The user query or command to execute.
 
     """
-    mcp_client = MCPClient(lambda: stdio_client(
-        StdioServerParameters(command="npx", args=["-y", "@azure/mcp@latest", "server", "start"])
-    ))
+    mcp_client = MCPClient(
+        lambda: stdio_client(
+            StdioServerParameters(
+                command="npx", args=["-y", "@azure/mcp@latest", "server", "start"]
+            )
+        )
+    )
 
     model = get_model()
 
     with mcp_client:
         # Get the tools from the MCP server
         mcp_tools = mcp_client.list_tools_sync()
-        
+
         # Combine MCP tools with the external shell tool
         all_tools = mcp_tools + [shell]
 
@@ -163,7 +167,7 @@ def use_azure(prompt: str) -> str:
             tools=all_tools,
             system_prompt=SYSTEM_PROMPT,
             model=model,
-            callback_handler=CustomCallbackHandler()
+            callback_handler=CustomCallbackHandler(),
         )
-        
+
         agent(prompt)

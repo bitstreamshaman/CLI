@@ -115,11 +115,12 @@ EXAMPLE:
 I will execute the following command in the terminal: docker ps -a
 """
 
+
 @tool
 def use_docker(prompt: str):
     """
     Tool Usage: Comprehensive Docker operations using specialized MCP tools and Docker CLI commands.
-    
+
     This tool provides access to Docker operations through a combination of specialized MCP tools
     and Docker CLI commands via the shell tool. For any operations not covered by the MCP tools,
     it defaults to using Docker CLI commands.
@@ -128,26 +129,25 @@ def use_docker(prompt: str):
         prompt (str): The user's request for Docker operations.
     """
 
-    mcp_client = MCPClient(lambda: stdio_client(
-    StdioServerParameters(command="uvx", args=["docker-mcp"])
-    )) #Only Linux and MacOS supported
-    
+    mcp_client = MCPClient(
+        lambda: stdio_client(StdioServerParameters(command="uvx", args=["docker-mcp"]))
+    )  # Only Linux and MacOS supported
+
     model = get_model()
 
     with mcp_client:
         # Get the tools from the MCP server
         mcp_tools = mcp_client.list_tools_sync()
-        
+
         # Combine MCP tools with the external shell tool
         all_tools = mcp_tools + [shell]
-        
+
         # Create an agent with both MCP tools and shell tool
         agent = Agent(
             tools=all_tools,
             system_prompt=SYSTEM_PROMPT,
             model=model,
-            callback_handler=CustomCallbackHandler()
+            callback_handler=CustomCallbackHandler(),
         )
-        
+
         agent(prompt)
-    

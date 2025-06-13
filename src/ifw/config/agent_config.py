@@ -2,7 +2,8 @@
 Agent Configuration for Infraware Cloud Assistant.
 Manages system prompt and agent initialization.
 """
-#Strands imports
+
+# Strands imports
 from strands import Agent
 from strands_tools import use_aws, shell
 
@@ -11,12 +12,11 @@ from ..utils.callback_handler import CustomCallbackHandler
 from strands.agent.conversation_manager import SlidingWindowConversationManager
 from ..utils.model import get_model
 
-#Internal Tools
+# Internal Tools
 from ..tools.cloud import use_gcp
 from ..tools.cloud import use_azure
 from ..tools.containers import use_docker
 from ..tools.memory import use_memory
-
 
 
 SYSTEM_PROMPT = """
@@ -200,17 +200,10 @@ def create_orchestrator_agent():
         window_size=20,  # Maximum number of messages to keep
     )
 
-
     return Agent(
-        tools=[
-            use_gcp, 
-            use_aws, 
-            use_azure, 
-            use_docker, 
-            shell, 
-            use_memory],
+        tools=[use_gcp, use_aws, use_azure, use_docker, shell, use_memory],
         model=get_model(),
         conversation_manager=conversation_manager,
         callback_handler=CustomCallbackHandler(),
-        system_prompt=SYSTEM_PROMPT
+        system_prompt=SYSTEM_PROMPT,
     )
