@@ -83,12 +83,6 @@ def print_banner():
     commands_text.append("  • ", style="bright_white")
     commands_text.append("exit", style="#2B1BD1 bold")
     commands_text.append(" - Quit the application\n", style="white")
-    commands_text.append("  • ", style="bright_white")
-    commands_text.append("clear", style="#2B1BD1 bold")
-    commands_text.append(" - Clear the screen\n", style="white")
-    commands_text.append("  • ", style="bright_white")
-    commands_text.append("reset", style="#2B1BD1 bold")
-    commands_text.append(" - Reset shell state to initial directory\n", style="white")
     
     info_panel = Panel(
         Text.assemble(status_text, "\n\n", commands_text),
