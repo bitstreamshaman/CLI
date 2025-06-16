@@ -59,7 +59,7 @@ Before you begin, ensure you have:
 
 3. **Install dependencies**:
    ```bash
-   uv add -e .
+   uv pip install .
    ```
 
 4. **Verify installation**:
