@@ -46,11 +46,13 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "anthropic",
+    "faiss-cpu>=1.11.0",
     "mem0ai>=0.1.104",
     "opensearch-py>=2.8.0",
     "rich>=10.0.0",
-    "strands-agents",
-    "strands-agents-tools",
+    "sentence-transformers>=4.1.0",
+    "strands-agents<=1.6.0",
+    "strands-agents-tools>=0.1.5",
     "thefuzz>=0.22.1",
 ]
 
