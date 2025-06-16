@@ -1,8 +1,7 @@
-# memory/quiet_memory_tools.py
+# memory/use_memory.py
 from .force_faiss_config import force_faiss_config
 from strands.agent import Agent
 from strands import tool
-from strands_tools import mem0_memory
 from ...utils.model import get_model
 from .user_id_manager import get_persistent_user_id
 import json
@@ -10,8 +9,14 @@ import sys
 import io
 import logging
 
-# Initialize configuration
+
+# Initialize configuration (Monkey Patch before tool import)
 force_faiss_config()
+
+
+from strands_tools import mem0_memory
+
+
 
 # Global memory agent instance
 _memory_agent = None
