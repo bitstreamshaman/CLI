@@ -213,7 +213,37 @@ This project is licensed under the Apache-2.0 License - see the [LICENSE](LICENS
 
 - **Documentation**: [docs.infraware.dev](https://docs.infraware.dev)
 - **Issues**: [GitHub Issues](https://github.com/Infraware-dev/CLI/issues)
-- **Community**: [Join our Discord](https://discord.gg/infraware)
+- **Community**: [Join our Discord](https://discord.gg/JneH864t)
+
+## ⚠️ Disclaimer
+
+**Infraware CLI is currently in Alpha** and should be considered experimental software. While we're working hard to make it stable and reliable, you may encounter:
+
+- **Unexpected behavior** or crashes during operation
+- **Breaking changes** between versions without notice
+- **Limited error handling** in some scenarios
+- **Performance issues** or slower response times
+
+### 🐛 Debugging and Support
+
+If you encounter issues while using Infraware CLI:
+
+1. **Enable verbose logging** to get detailed information:
+   ```bash
+   ifw -v
+   ```
+
+2. **Check the log files** for detailed error information:
+   - **Location**: `~/.ifw/logs/`
+   - **Format**: `log_YYYYMMDD_HHMMSS.txt` (timestamped for each session)
+   - **Contains**: Full debug output, error traces, and system information
+
+3. **Get help from the community**:
+   - **Report bugs**: [Open a GitHub Issue](https://github.com/Infraware-dev/CLI/issues) with your log files attached
+   - **Real-time support**: [Join our Discord](https://discord.gg/JneH864t) for immediate assistance
+   - **Include details**: OS, Python version, and relevant log snippets when reporting issues
+
+**We appreciate your patience and feedback as we work toward a stable release!**
 
 ## 🚀 What's Next?
 
