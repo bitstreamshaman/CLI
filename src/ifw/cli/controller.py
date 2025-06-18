@@ -224,6 +224,12 @@ class CLIController:
         )
         self.exit_requested = True
 
+    def _handle_command_error(self, error):
+        self.console.print(
+            f"[red]❌ Fatal error in CLI: {error}[/red]"
+        )
+        self.exit_requested = True
+
     def _handle_unexpected_error(self, error: Exception):
         """Handle unexpected errors in main loop."""
         self.console.print(f"[red]❌ Fatal error in CLI: {error}[/red]")
