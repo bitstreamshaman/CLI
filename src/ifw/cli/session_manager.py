@@ -9,7 +9,6 @@ from typing import Dict
 from prompt_toolkit import prompt
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.shortcuts import CompleteStyle
-from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.formatted_text import HTML
 from rich.console import Console
 
@@ -44,7 +43,6 @@ class SessionManager:
         # Initialize prompt_toolkit components
         self.history = InMemoryHistory()
         self.smart_completer = SmartCompleter(shell_executor)
-        self.key_bindings = self._create_key_bindings()
 
         # Cache for context to avoid repeated system calls
         self._context_cache = None
@@ -77,7 +75,6 @@ class SessionManager:
                 completer=self.smart_completer,
                 history=self.history,
                 complete_style=CompleteStyle.READLINE_LIKE,
-                key_bindings=self.key_bindings,
                 enable_history_search=True,  # Enables Ctrl+R reverse search
                 complete_while_typing=False,  # Set to True for real-time completion
             )
@@ -128,40 +125,6 @@ class SessionManager:
             # Don't cache fallback values
             return fallback_context
 
-    def _create_key_bindings(self) -> KeyBindings:
-        """
-        Create custom key bindings for enhanced terminal experience.
-
-        Returns:
-            KeyBindings object with custom shortcuts
-        """
-        kb = KeyBindings()
-
-        # Ctrl+L to clear screen
-        @kb.add("c-l")
-        def clear_screen(event):
-            """Clear the terminal screen."""
-            event.app.renderer.clear()
-
-        # Future key bindings can be added here:
-        # @kb.add('c-r')  # Ctrl+R for reverse search (already built-in)
-        # @kb.add('c-d')  # Ctrl+D for EOF (already built-in)
-
-        return kb
-
-    def add_to_history(self, command: str) -> None:
-        """
-        Manually add a command to session history.
-
-        Args:
-            command: Command string to add to history
-        """
-        if command and command.strip():
-            self.history.append_string(command.strip())
-
-    def clear_history(self) -> None:
-        """Clear command history."""
-        self.history = InMemoryHistory()
 
     def get_history_list(self) -> list[str]:
         """

@@ -1,433 +1,919 @@
-#!/usr/bin/env python3
 """
-Test script for CLI Controller.
+Comprehensive unit test suite for CLIController class.
+Uses pure pytest - tests controller orchestration and lifecycle management.
 """
-# Import the CLI controller
+
+import pytest
+from rich.console import Console
+from io import StringIO
+
+# Import the classes to test
 from ifw.cli.controller import (
     CLIController,
     CLIInitializationError,
     create_cli_controller,
 )
 
-import sys
-import unittest
-from unittest.mock import Mock, patch
-from io import StringIO
-from rich.console import Console
+
+class MockAgent:
+    """Mock agent for testing."""
+
+    def __init__(self):
+        self.messages = []
+        self.call_count = 0
+
+    def __call__(self, user_input):
+        self.call_count += 1
+        return f"AI response to: {user_input}"
 
 
+class MockShellExecutor:
+    """Mock shell executor for testing."""
 
-class TestCLIController(unittest.TestCase):
-    """Test suite for CLI Controller."""
+    def __init__(self):
+        self.executed_commands = []
+        self.interrupt_called = False
+        self.should_interrupt = True
 
-    def setUp(self):
-        """Set up test fixtures."""
-        # Create mock agent
-        self.mock_agent = Mock()
-        self.mock_agent.side_effect = lambda x: f"AI response to: {x}"
+    def execute_shell_command(self, command):
+        self.executed_commands.append(command)
+        return f"Output of: {command}"
 
-        # Create console that captures output
-        self.test_console = Console(file=StringIO(), width=80)
-
-        # Mock the shell components to avoid file system dependencies
-        self.shell_executor_patcher = patch("ifw.cli.controller.ShellCommandExecutor")
-        self.shell_detector_patcher = patch("ifw.cli.controller.ShellCommandDetector")
-
-        self.mock_shell_executor = self.shell_executor_patcher.start()
-        self.mock_shell_detector = self.shell_detector_patcher.start()
-
-        # Configure shell executor mock
-        self.mock_shell_executor.return_value.get_current_directory.return_value = (
-            "/test/dir"
-        )
-        self.mock_shell_executor.return_value.interrupt_current_command.return_value = (
-            False
-        )
-
-        # Configure shell detector mock
-        self.mock_shell_detector.return_value.is_shell_command.side_effect = (
-            lambda x: x.startswith(("ls", "cd", "pwd"))
-        )
-
-    def tearDown(self):
-        """Clean up after tests."""
-        self.shell_executor_patcher.stop()
-        self.shell_detector_patcher.stop()
-
-    def test_cli_controller_initialization(self):
-        """Test CLI controller initialization."""
-        cli = CLIController(agent=self.mock_agent, console=self.test_console)
-
-        self.assertIsNotNone(cli.session_manager)
-        self.assertIsNotNone(cli.command_processor)
-        self.assertEqual(len(cli.handlers), 3)  # control, shell, ai
-        self.assertFalse(cli.running)
-        self.assertFalse(cli.exit_requested)
-
-    def test_cli_controller_initialization_without_agent(self):
-        """Test CLI controller initialization without agent."""
-        cli = CLIController(console=self.test_console)
-
-        # Should still initialize but agent will be None
-        self.assertIsNotNone(cli.session_manager)
-        self.assertIsNotNone(cli.command_processor)
-        self.assertIsNone(cli.agent)
-
-    def test_factory_function(self):
-        """Test factory function for creating CLI controller."""
-        cli = create_cli_controller(agent=self.mock_agent, console=self.test_console)
-
-        self.assertIsInstance(cli, CLIController)
-        self.assertEqual(cli.agent, self.mock_agent)
-        self.assertEqual(cli.console, self.test_console)
-
-    def test_handler_management(self):
-        """Test adding and removing handlers."""
-        cli = CLIController(agent=self.mock_agent, console=self.test_console)
-
-        initial_count = len(cli.handlers)
-
-        # Add a mock handler
-        mock_handler = Mock()
-        mock_handler.__class__ = Mock()
-        mock_handler.__class__.__name__ = "TestHandler"
-
-        cli.add_handler(mock_handler)
-        self.assertEqual(len(cli.handlers), initial_count + 1)
-
-        # Remove the handler
-        removed = cli.remove_handler(type(mock_handler))
-        self.assertTrue(removed)
-        self.assertEqual(len(cli.handlers), initial_count)
-
-    def test_statistics_and_reset(self):
-        """Test statistics gathering and reset."""
-        cli = CLIController(agent=self.mock_agent, console=self.test_console)
-
-        # Get initial statistics
-        stats = cli.get_statistics()
-
-        self.assertIn("cli_status", stats)
-        self.assertIn("session", stats)
-        self.assertIn("command_processing", stats)
-        self.assertIn("handlers", stats)
-
-        # Test reset
-        cli.reset_statistics()
-        # Should not raise an error
-
-    def test_session_context(self):
-        """Test session context retrieval."""
-        cli = CLIController(agent=self.mock_agent, console=self.test_console)
-
-        context = cli.get_session_context()
-
-        self.assertIsInstance(context, dict)
-        # Should have basic context keys (mock will provide defaults)
-
-    def test_debug_mode(self):
-        """Test debug mode setting."""
-        cli = CLIController(
-            agent=self.mock_agent, console=self.test_console, debug_mode=True
-        )
-
-        self.assertTrue(cli.debug_mode)
-
-        cli.set_debug_mode(False)
-        self.assertFalse(cli.debug_mode)
-
-    def test_string_representations(self):
-        """Test string representation methods."""
-        cli = CLIController(agent=self.mock_agent, console=self.test_console)
-
-        str_repr = str(cli)
-        self.assertIn("CLIController", str_repr)
-
-        repr_str = repr(cli)
-        self.assertIn("CLIController", repr_str)
-        self.assertIn("handlers=3", repr_str)
-
-    def test_stop_method(self):
-        """Test stop method."""
-        cli = CLIController(agent=self.mock_agent, console=self.test_console)
-
-        cli.stop()
-
-        self.assertTrue(cli.exit_requested)
-        self.assertFalse(cli.running)
-
-    @patch("ifw.cli.controller.SessionManager")
-    def test_initialization_error_handling(self, mock_session_manager):
-        """Test error handling during initialization."""
-        # Make session manager initialization fail
-        mock_session_manager.side_effect = Exception("Session manager failed")
-
-        with self.assertRaises(CLIInitializationError):
-            CLIController(agent=self.mock_agent, console=self.test_console)
+    def interrupt_current_command(self):
+        self.interrupt_called = True
+        return self.should_interrupt
 
 
-class TestCLIControllerIntegration(unittest.TestCase):
-    """Integration tests for CLI Controller with mocked dependencies."""
+class MockShellDetector:
+    """Mock shell detector for testing."""
 
-    def setUp(self):
-        """Set up integration test fixtures."""
-        self.mock_agent = Mock()
-        self.test_console = Console(file=StringIO(), width=80)
+    def __init__(self):
+        self.is_shell_responses = {}
 
-        # Patch all external dependencies
-        self.patches = {
-            "ShellCommandExecutor": patch("ifw.cli.controller.ShellCommandExecutor"),
-            "ShellCommandDetector": patch("ifw.cli.controller.ShellCommandDetector"),
-            "SessionManager": patch("ifw.cli.controller.SessionManager"),
-            "ControlCommandHandler": patch("ifw.cli.controller.ControlCommandHandler"),
-            "ShellCommandHandler": patch("ifw.cli.controller.ShellCommandHandler"),
-            "AIRequestHandler": patch("ifw.cli.controller.AIRequestHandler"),
-            "CommandProcessor": patch("ifw.cli.controller.CommandProcessor"),
+    def is_shell_command(self, command):
+        return self.is_shell_responses.get(command, False)
+
+    def set_shell_command(self, command, is_shell=True):
+        self.is_shell_responses[command] = is_shell
+
+
+class MockSessionManager:
+    """Mock session manager for testing."""
+
+    def __init__(self, shell_executor=None, console=None):
+        self.input_queue = []
+        self.input_index = 0
+        self.context = {"username": "testuser", "cwd": "/test"}
+        self.session_info = {"commands_run": 0}
+        self.shell_executor = shell_executor
+        self.console = console
+
+    def get_user_input(self):
+        if self.input_index < len(self.input_queue):
+            result = self.input_queue[self.input_index]
+            self.input_index += 1
+            return result
+        raise EOFError("No more input")
+
+    def add_input(self, user_input):
+        self.input_queue.append(user_input)
+
+    def get_context(self):
+        return self.context
+
+    def get_session_info(self):
+        return self.session_info
+
+    def force_context_refresh(self):
+        pass
+
+
+class MockHandler:
+    """Mock handler for testing."""
+
+    def __init__(self, name, can_handle_result=True, handle_result=True):
+        self.name = name
+        self.can_handle_result = can_handle_result
+        self.handle_result = handle_result
+        self.handled_commands = []
+        self.can_handle_calls = []
+
+    def can_handle(self, user_input):
+        self.can_handle_calls.append(user_input)
+        if callable(self.can_handle_result):
+            return self.can_handle_result(user_input)
+        return self.can_handle_result
+
+    def handle(self, user_input):
+        self.handled_commands.append(user_input)
+        if callable(self.handle_result):
+            return self.handle_result(user_input)
+        return self.handle_result
+
+
+class MockCommandProcessor:
+    """Mock command processor for testing."""
+
+    def __init__(self, handlers=None, console=None):
+        self.processed_commands = []
+        self.handlers = handlers or []
+        self.console = console
+        self.should_raise = None
+        self.stats = {
+            "total_commands": 0,
+            "successful_commands": 0,
+            "failed_commands": 0,
+            "success_rate": 100.0,
+            "handler_stats": {},
         }
 
-        self.mocks = {}
-        for name, patcher in self.patches.items():
-            self.mocks[name] = patcher.start()
+    def process_command(self, user_input):
+        self.processed_commands.append(user_input)
+        self.stats["total_commands"] += 1
 
-    def tearDown(self):
-        """Clean up patches."""
-        for patcher in self.patches.values():
-            patcher.stop()
+        if self.should_raise:
+            raise self.should_raise
 
-    def test_component_initialization_order(self):
-        """Test that components are initialized in correct order."""
-        CLIController(agent=self.mock_agent, console=self.test_console)
+        self.stats["successful_commands"] += 1
+        return True
 
-        # Verify initialization calls were made
-        self.mocks["ShellCommandExecutor"].assert_called_once()
-        self.mocks["ShellCommandDetector"].assert_called_once()
-        self.mocks["SessionManager"].assert_called_once()
-        self.mocks["ControlCommandHandler"].assert_called_once()
-        self.mocks["ShellCommandHandler"].assert_called_once()
-        self.mocks["AIRequestHandler"].assert_called_once()
-        self.mocks["CommandProcessor"].assert_called_once()
+    def get_processing_stats(self):
+        return self.stats.copy()
 
-    def test_handler_dependency_injection(self):
-        """Test that handlers are created with correct dependencies."""
-        CLIController(agent=self.mock_agent, console=self.test_console)
+    def reset_stats(self):
+        self.stats = {
+            "total_commands": 0,
+            "successful_commands": 0,
+            "failed_commands": 0,
+            "success_rate": 100.0,
+            "handler_stats": {},
+        }
 
-        # Check that handlers were created with expected arguments
-        shell_executor_instance = self.mocks["ShellCommandExecutor"].return_value
-        shell_detector_instance = self.mocks["ShellCommandDetector"].return_value
+    def add_handler(self, handler, position=None):
+        if position is None:
+            self.handlers.append(handler)
+        else:
+            self.handlers.insert(position, handler)
 
-        # Control handler should get executor and console
-        self.mocks["ControlCommandHandler"].assert_called_with(
-            shell_executor_instance, self.test_console
-        )
+    def remove_handler(self, handler_class):
+        for i, handler in enumerate(self.handlers):
+            if isinstance(handler, handler_class):
+                self.handlers.pop(i)
+                return True
+        return False
 
-        # Shell handler should get agent, executor, detector, console
-        self.mocks["ShellCommandHandler"].assert_called_with(
-            self.mock_agent,
-            shell_executor_instance,
-            shell_detector_instance,
-            self.test_console,
-        )
-
-        # AI handler should get agent, executor, console
-        self.mocks["AIRequestHandler"].assert_called_with(
-            self.mock_agent, shell_executor_instance, self.test_console
-        )
-
-    @patch("builtins.input", return_value="n")
-    def test_error_recovery_user_choice(self, mock_input):
-        """Test error recovery with user choosing to exit."""
-        cli = CLIController(
-            agent=self.mock_agent, console=self.test_console, debug_mode=True
-        )
-
-        # Simulate an unexpected error
-        test_error = Exception("Test error")
-        cli._handle_unexpected_error(test_error)
-
-        # Should set exit_requested to True
-        self.assertTrue(cli.exit_requested)
+    def list_handlers(self):
+        return [h.__class__.__name__ for h in self.handlers]
 
 
-class TestCLIControllerCommandProcessing(unittest.TestCase):
-    """Test command processing in CLI Controller."""
-
-    def setUp(self):
-        """Set up command processing test fixtures."""
-        self.mock_agent = Mock()
-        self.test_console = Console(file=StringIO(), width=80)
-
-        # Create CLI with mocked components
-        with patch.multiple(
-            "ifw.cli.controller",
-            ShellCommandExecutor=Mock(),
-            ShellCommandDetector=Mock(),
-            SessionManager=Mock(),
-            ControlCommandHandler=Mock(),
-            ShellCommandHandler=Mock(),
-            AIRequestHandler=Mock(),
-            CommandProcessor=Mock(),
-        ):
-            self.cli = CLIController(agent=self.mock_agent, console=self.test_console)
-
-    def test_process_command_success(self):
-        """Test successful command processing."""
-        # Mock successful command processing
-        self.cli.command_processor.process_command.return_value = True
-
-        # Should not raise any exceptions
-        self.cli._process_command("test command")
-
-        # Verify command processor was called
-        self.cli.command_processor.process_command.assert_called_once_with(
-            "test command"
-        )
-
-    def test_process_command_failure(self):
-        """Test command processing failure."""
-        # Mock failed command processing
-        self.cli.command_processor.process_command.return_value = False
-
-        # Should handle gracefully
-        self.cli._process_command("test command")
-
-        # Check that warning was printed to console
-        output = self.test_console.file.getvalue()
-        self.assertIn("Command execution was not successful", output)
-
-    def test_process_command_exception(self):
-        """Test command processing with exception."""
-        from ifw.cli.command_processor import CommandProcessingError
-
-        # Mock command processor raising exception
-        self.cli.command_processor.process_command.side_effect = CommandProcessingError(
-            "Test error"
-        )
-
-        # Should handle gracefully
-        self.cli._process_command("test command")
-
-        # Check that error was printed to console
-        output = self.test_console.file.getvalue()
-        self.assertIn("Command processing error", output)
+# Mock implementations that will replace real classes
+def mock_session_manager_factory(shell_executor, console):
+    return MockSessionManager(shell_executor, console)
 
 
-def run_manual_test():
-    """Manual test that doesn't require all dependencies."""
-    print("🧪 Manual CLI Controller Test")
-    print("=" * 50)
+def mock_command_processor_factory(handlers, console):
+    return MockCommandProcessor(handlers, console)
 
-    try:
-        # Create mock agent
-        mock_agent = Mock()
-        mock_agent.side_effect = lambda x: print(f"[AI] Processing: {x}")
 
+def mock_shell_executor_factory():
+    return MockShellExecutor()
+
+
+def mock_shell_detector_factory():
+    return MockShellDetector()
+
+
+def mock_control_handler_factory(shell_executor, console):
+    return MockHandler("ControlHandler")
+
+
+def mock_shell_handler_factory(agent, shell_executor, shell_detector, console):
+    return MockHandler("ShellHandler")
+
+
+def mock_ai_handler_factory(agent, shell_executor, console):
+    return MockHandler("AIHandler")
+
+
+# Fixtures
+@pytest.fixture
+def mock_agent():
+    """Provide a mock agent."""
+    return MockAgent()
+
+
+@pytest.fixture
+def console():
+    """Provide a console for testing."""
+    return Console()
+
+
+@pytest.fixture
+def string_console():
+    """Provide a console that captures output."""
+    string_io = StringIO()
+    return Console(file=string_io, force_terminal=False)
+
+
+@pytest.fixture
+def mock_cli_controller(monkeypatch):
+    """Provide a CLIController with all dependencies mocked."""
+    # Create mock agent
+    mock_agent = MockAgent()
+    console = Console()
+
+    # Mock all the imports
+    monkeypatch.setattr(
+        "ifw.cli.controller.SessionManager", mock_session_manager_factory
+    )
+    monkeypatch.setattr(
+        "ifw.cli.controller.CommandProcessor", mock_command_processor_factory
+    )
+    monkeypatch.setattr(
+        "ifw.cli.controller.ShellCommandExecutor", mock_shell_executor_factory
+    )
+    monkeypatch.setattr(
+        "ifw.cli.controller.ShellCommandDetector", mock_shell_detector_factory
+    )
+    monkeypatch.setattr(
+        "ifw.cli.controller.ControlCommandHandler", mock_control_handler_factory
+    )
+    monkeypatch.setattr(
+        "ifw.cli.controller.ShellCommandHandler", mock_shell_handler_factory
+    )
+    monkeypatch.setattr("ifw.cli.controller.AIRequestHandler", mock_ai_handler_factory)
+
+    return CLIController(agent=mock_agent, console=console)
+
+
+def create_mock_cli_controller(monkeypatch, mock_agent=None, console=None):
+    """Helper function to create a mock CLI controller."""
+    if mock_agent is None:
+        mock_agent = MockAgent()
+    if console is None:
         console = Console()
 
-        # Test basic creation (may fail due to missing dependencies)
-        try:
-            cli = create_cli_controller(
-                agent=mock_agent, console=console, debug_mode=True
-            )
-            print("✅ CLI Controller created successfully")
-            print(f"   Controller: {cli}")
-
-            # Test statistics
-            stats = cli.get_statistics()
-            print(f"✅ Statistics retrieved: {len(stats)} keys")
-
-            # Test string representations
-            print(f"✅ String repr: {str(cli)}")
-            print(f"✅ Detailed repr: {repr(cli)}")
-
-            print("\n📋 Available methods:")
-            methods = [method for method in dir(cli) if not method.startswith("_")]
-            for method in sorted(methods):
-                print(f"   - {method}")
-
-        except Exception as e:
-            print(f"⚠️  CLI creation failed (expected if dependencies missing): {e}")
-            print("   This is normal if running without proper imports.")
-
-        print("\n✅ Manual test completed!")
-
-    except Exception as e:
-        print(f"❌ Manual test failed: {e}")
-
-
-def run_tests():
-    """Run all tests."""
-    # Create test loader
-    loader = unittest.TestLoader()
-
-    # Create test suite
-    test_suite = unittest.TestSuite()
-
-    # Add test cases
-    test_suite.addTests(loader.loadTestsFromTestCase(TestCLIController))
-    test_suite.addTests(loader.loadTestsFromTestCase(TestCLIControllerIntegration))
-    test_suite.addTests(
-        loader.loadTestsFromTestCase(TestCLIControllerCommandProcessing)
+    # Mock all the imports
+    monkeypatch.setattr(
+        "ifw.cli.controller.SessionManager", mock_session_manager_factory
     )
+    monkeypatch.setattr(
+        "ifw.cli.controller.CommandProcessor", mock_command_processor_factory
+    )
+    monkeypatch.setattr(
+        "ifw.cli.controller.ShellCommandExecutor", mock_shell_executor_factory
+    )
+    monkeypatch.setattr(
+        "ifw.cli.controller.ShellCommandDetector", mock_shell_detector_factory
+    )
+    monkeypatch.setattr(
+        "ifw.cli.controller.ControlCommandHandler", mock_control_handler_factory
+    )
+    monkeypatch.setattr(
+        "ifw.cli.controller.ShellCommandHandler", mock_shell_handler_factory
+    )
+    monkeypatch.setattr("ifw.cli.controller.AIRequestHandler", mock_ai_handler_factory)
 
-    # Run tests
-    runner = unittest.TextTestRunner(verbosity=2, stream=sys.stdout)
-    result = runner.run(test_suite)
+    return CLIController(agent=mock_agent, console=console)
 
-    # Print summary
-    print(f"\n{'=' * 60}")
-    print("🧪 Test Summary:")
-    print(f"Tests run: {result.testsRun}")
-    print(f"Failures: {len(result.failures)}")
-    print(f"Errors: {len(result.errors)}")
 
-    if result.testsRun > 0:
-        success_rate = (
-            (result.testsRun - len(result.failures) - len(result.errors))
-            / result.testsRun
-            * 100
+class TestCLIControllerInitialization:
+    """Test CLIController initialization."""
+
+    def test_successful_initialization(self, mock_agent, console, monkeypatch):
+        """Test successful CLIController initialization."""
+        # Mock all dependencies
+        monkeypatch.setattr(
+            "ifw.cli.controller.SessionManager", mock_session_manager_factory
         )
-        print(f"Success rate: {success_rate:.1f}%")
+        monkeypatch.setattr(
+            "ifw.cli.controller.CommandProcessor", mock_command_processor_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandExecutor", mock_shell_executor_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandDetector", mock_shell_detector_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ControlCommandHandler", mock_control_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandHandler", mock_shell_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.AIRequestHandler", mock_ai_handler_factory
+        )
 
-    if result.failures:
-        print("\n❌ Failures:")
-        for test, traceback in result.failures:
-            print(f"  {test}")
+        controller = CLIController(agent=mock_agent, console=console, debug_mode=True)
 
-    if result.errors:
-        print("\n🚨 Errors:")
-        for test, traceback in result.errors:
-            print(f"  {test}")
+        assert controller.agent == mock_agent
+        assert controller.console == console
+        assert controller.debug_mode is True
+        assert controller.running is False
+        assert controller.exit_requested is False
+        assert len(controller.handlers) == 3
 
-    if result.wasSuccessful():
-        print("\n✅ All tests passed!")
-    else:
-        print("\n⚠️  Some tests failed!")
+    def test_initialization_with_defaults(self, mock_agent, monkeypatch):
+        """Test initialization with default parameters."""
+        # Mock all dependencies
+        monkeypatch.setattr(
+            "ifw.cli.controller.SessionManager", mock_session_manager_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.CommandProcessor", mock_command_processor_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandExecutor", mock_shell_executor_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandDetector", mock_shell_detector_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ControlCommandHandler", mock_control_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandHandler", mock_shell_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.AIRequestHandler", mock_ai_handler_factory
+        )
 
-    return result.wasSuccessful()
+        controller = CLIController(agent=mock_agent)
+
+        assert controller.agent == mock_agent
+        assert isinstance(controller.console, Console)
+        assert controller.debug_mode is False
+
+    def test_initialization_failure_in_components(
+        self, mock_agent, console, monkeypatch
+    ):
+        """Test initialization failure during component setup."""
+
+        def failing_shell_executor():
+            raise Exception("Executor initialization failed")
+
+        # Mock other dependencies normally, but make shell executor fail
+        monkeypatch.setattr(
+            "ifw.cli.controller.SessionManager", mock_session_manager_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.CommandProcessor", mock_command_processor_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandExecutor", failing_shell_executor
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandDetector", mock_shell_detector_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ControlCommandHandler", mock_control_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandHandler", mock_shell_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.AIRequestHandler", mock_ai_handler_factory
+        )
+
+        with pytest.raises(CLIInitializationError) as exc_info:
+            CLIController(agent=mock_agent, console=console)
+
+        assert "Failed to initialize CLI" in str(exc_info.value)
+        assert "Executor initialization failed" in str(exc_info.value)
+
+    def test_initialization_failure_in_handlers(self, mock_agent, console, monkeypatch):
+        """Test initialization failure during handler setup."""
+
+        def failing_control_handler(shell_executor, console):
+            raise Exception("Control handler initialization failed")
+
+        # Mock dependencies normally, but make control handler fail
+        monkeypatch.setattr(
+            "ifw.cli.controller.SessionManager", mock_session_manager_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.CommandProcessor", mock_command_processor_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandExecutor", mock_shell_executor_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandDetector", mock_shell_detector_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ControlCommandHandler", failing_control_handler
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandHandler", mock_shell_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.AIRequestHandler", mock_ai_handler_factory
+        )
+
+        with pytest.raises(CLIInitializationError) as exc_info:
+            CLIController(agent=mock_agent, console=console)
+
+        assert "Failed to initialize handlers" in str(exc_info.value)
+
+    def test_initialization_failure_in_processors(
+        self, mock_agent, console, monkeypatch
+    ):
+        """Test initialization failure during processor setup."""
+
+        def failing_command_processor(handlers, console):
+            raise Exception("Processor initialization failed")
+
+        # Mock dependencies normally, but make command processor fail
+        monkeypatch.setattr(
+            "ifw.cli.controller.SessionManager", mock_session_manager_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.CommandProcessor", failing_command_processor
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandExecutor", mock_shell_executor_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandDetector", mock_shell_detector_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ControlCommandHandler", mock_control_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandHandler", mock_shell_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.AIRequestHandler", mock_ai_handler_factory
+        )
+
+        with pytest.raises(CLIInitializationError) as exc_info:
+            CLIController(agent=mock_agent, console=console)
+
+        assert "Failed to initialize command processor" in str(exc_info.value)
+
+
+class TestCLIControllerRunMethod:
+    """Test CLIController run method and main loop."""
+
+    def test_run_with_single_command(self, monkeypatch):
+        """Test running CLI with a single command."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        # Add input to session manager
+        controller.session_manager.add_input("test command")
+
+        # Run the CLI
+        controller.run()
+
+        # Verify command was processed
+        assert len(controller.command_processor.processed_commands) == 1
+        assert controller.command_processor.processed_commands[0] == "test command"
+        assert not controller.running
+
+    def test_run_with_multiple_commands(self, monkeypatch):
+        """Test running CLI with multiple commands."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        # Add multiple inputs
+        controller.session_manager.add_input("command1")
+        controller.session_manager.add_input("command2")
+        controller.session_manager.add_input("command3")
+
+        controller.run()
+
+        # Verify all commands were processed
+        assert len(controller.command_processor.processed_commands) == 3
+        assert controller.command_processor.processed_commands == [
+            "command1",
+            "command2",
+            "command3",
+        ]
+
+    def test_run_with_empty_input_skipped(self, monkeypatch):
+        """Test that empty input is skipped."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        # Add empty and whitespace inputs
+        controller.session_manager.add_input("")
+        controller.session_manager.add_input("   ")
+        controller.session_manager.add_input("real command")
+
+        controller.run()
+
+        # Only the real command should be processed
+        assert len(controller.command_processor.processed_commands) == 1
+        assert controller.command_processor.processed_commands[0] == "real command"
+
+    def test_run_handles_eof_gracefully(self, monkeypatch):
+        """Test that EOFError (Ctrl+D) is handled gracefully."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        # No input added, so EOFError will be raised immediately
+        controller.run()
+
+        assert controller.exit_requested
+        assert not controller.running
+
+    def test_run_handles_keyboard_interrupt(self, monkeypatch):
+        """Test that KeyboardInterrupt is handled gracefully."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        # Track how many times get_user_input is called to prevent infinite loop
+        call_count = 0
+
+        def raise_keyboard_interrupt():
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise KeyboardInterrupt()
+            else:
+                # After the first KeyboardInterrupt, raise EOFError to exit
+                raise EOFError()
+
+        # Mock session manager to raise KeyboardInterrupt then EOF
+        monkeypatch.setattr(
+            controller.session_manager, "get_user_input", raise_keyboard_interrupt
+        )
+
+        controller.run()
+
+        # Should handle interrupt and then exit on EOF
+        assert not controller.running
+        assert call_count >= 1
+
+
+class TestCLIControllerCommandProcessing:
+    """Test command processing functionality."""
+
+    def test_process_command_success(self, monkeypatch):
+        """Test successful command processing."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        controller._process_command("test command")
+
+        assert len(controller.command_processor.processed_commands) == 1
+        assert controller.command_processor.processed_commands[0] == "test command"
+
+    def test_process_command_with_command_processing_error(self, monkeypatch):
+        """Test handling of CommandProcessingError."""
+        from ifw.cli.command_processor import CommandProcessingError
+
+        controller = create_mock_cli_controller(monkeypatch)
+
+        # Make command processor raise error
+        controller.command_processor.should_raise = CommandProcessingError(
+            "Processing failed"
+        )
+
+        # Should not raise exception, but handle it gracefully
+        controller._process_command("failing command")
+
+        assert len(controller.command_processor.processed_commands) == 1
+
+    def test_process_command_with_no_handler_found_error(self, monkeypatch):
+        """Test handling of NoHandlerFoundError."""
+        from ifw.cli.command_processor import NoHandlerFoundError
+
+        controller = create_mock_cli_controller(monkeypatch)
+
+        # Make command processor raise error
+        controller.command_processor.should_raise = NoHandlerFoundError("No handler")
+
+        # Should not raise exception, but handle it gracefully
+        controller._process_command("unhandled command")
+
+        assert len(controller.command_processor.processed_commands) == 1
+
+    def test_process_command_with_unexpected_error(self, monkeypatch):
+        """Test handling of unexpected errors."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        # Make command processor raise unexpected error
+        controller.command_processor.should_raise = RuntimeError("Unexpected error")
+
+        # Should not raise exception, but handle it gracefully
+        controller._process_command("error command")
+
+        assert len(controller.command_processor.processed_commands) == 1
+
+
+class TestCLIControllerInterruptHandling:
+    """Test interrupt and signal handling."""
+
+    def test_handle_keyboard_interrupt_with_shell_interrupt(self, monkeypatch):
+        """Test keyboard interrupt when shell command can be interrupted."""
+        controller = create_mock_cli_controller(monkeypatch)
+        controller.shell_executor.should_interrupt = True
+
+        controller._handle_keyboard_interrupt()
+
+        assert controller.shell_executor.interrupt_called
+        # Should not exit, just interrupt current command
+        assert not controller.exit_requested
+
+    def test_handle_keyboard_interrupt_without_shell_interrupt(self, monkeypatch):
+        """Test keyboard interrupt when no shell command to interrupt."""
+        controller = create_mock_cli_controller(monkeypatch)
+        controller.shell_executor.should_interrupt = False
+
+        controller._handle_keyboard_interrupt()
+
+        assert controller.shell_executor.interrupt_called
+        assert not controller.exit_requested
+
+    def test_handle_command_interrupt(self, monkeypatch):
+        """Test handling interrupt during command processing."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        controller._handle_command_interrupt()
+
+        assert controller.shell_executor.interrupt_called
+
+    def test_handle_eof(self, monkeypatch):
+        """Test handling EOF (Ctrl+D)."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        controller._handle_eof()
+
+        assert controller.exit_requested
+
+    def test_handle_unexpected_error(self, monkeypatch):
+        """Test handling unexpected errors in main loop."""
+        controller = create_mock_cli_controller(monkeypatch)
+        test_error = RuntimeError("Unexpected error")
+
+        controller._handle_unexpected_error(test_error)
+
+        assert controller.exit_requested
+
+
+class TestCLIControllerLifecycle:
+    """Test CLI lifecycle management."""
+
+    def test_stop_method(self, monkeypatch):
+        """Test stopping the CLI gracefully."""
+        controller = create_mock_cli_controller(monkeypatch)
+        controller.running = True
+
+        controller.stop()
+
+        assert controller.exit_requested
+        assert not controller.running
+
+    def test_cleanup_method(self, monkeypatch):
+        """Test cleanup functionality."""
+        controller = create_mock_cli_controller(monkeypatch)
+        controller.running = True
+
+        controller._cleanup()
+
+        assert not controller.running
+
+
+class TestCLIControllerStatistics:
+    """Test statistics and monitoring functionality."""
+
+    def test_get_statistics(self, monkeypatch):
+        """Test getting comprehensive statistics."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        stats = controller.get_statistics()
+
+        assert "cli_status" in stats
+        assert "session" in stats
+        assert "command_processing" in stats
+        assert "handlers" in stats
+
+        # Check CLI status
+        assert "running" in stats["cli_status"]
+        assert "exit_requested" in stats["cli_status"]
+        assert "debug_mode" in stats["cli_status"]
+
+        # Check session info
+        assert stats["session"] == {"commands_run": 0}
+
+    def test_reset_statistics(self, monkeypatch):
+        """Test resetting statistics."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        # Process a command first
+        controller._process_command("test")
+
+        # Reset statistics
+        controller.reset_statistics()
+
+        stats = controller.get_statistics()
+        assert stats["command_processing"]["total_commands"] == 0
+
+
+class TestCLIControllerHandlerManagement:
+    """Test handler management functionality."""
+
+    def test_add_handler(self, monkeypatch):
+        """Test adding a new handler."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        new_handler = MockHandler("NewHandler")
+        initial_count = len(controller.handlers)
+
+        controller.add_handler(new_handler)
+
+        assert len(controller.handlers) == initial_count + 1
+        assert new_handler in controller.command_processor.handlers
+
+    def test_add_handler_at_position(self, monkeypatch):
+        """Test adding handler at specific position."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        new_handler = MockHandler("NewHandler")
+
+        controller.add_handler(new_handler, position=1)
+
+        assert controller.command_processor.handlers[1] == new_handler
+
+    def test_remove_handler(self, monkeypatch):
+        """Test removing a handler."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        initial_count = len(controller.handlers)
+
+        # Add a handler first
+        test_handler = MockHandler("TestHandler")
+        controller.add_handler(test_handler)
+
+        # Remove it
+        result = controller.remove_handler(MockHandler)
+
+        assert result is True
+        assert len(controller.handlers) == initial_count
+
+    def test_remove_nonexistent_handler(self, monkeypatch):
+        """Test removing a handler that doesn't exist."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        class NonExistentHandler:
+            pass
+
+        result = controller.remove_handler(NonExistentHandler)
+
+        assert result is False
+
+
+class TestCLIControllerUtilityMethods:
+    """Test utility and helper methods."""
+
+    def test_set_debug_mode(self, monkeypatch):
+        """Test setting debug mode."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        assert controller.debug_mode is False
+
+        controller.set_debug_mode(True)
+        assert controller.debug_mode is True
+
+        controller.set_debug_mode(False)
+        assert controller.debug_mode is False
+
+    def test_get_session_context(self, monkeypatch):
+        """Test getting session context."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        context = controller.get_session_context()
+
+        assert context == {"username": "testuser", "cwd": "/test"}
+
+    def test_force_context_refresh(self, monkeypatch):
+        """Test forcing context refresh."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        # Should not raise any errors
+        controller.force_context_refresh()
+
+    def test_string_representation(self, monkeypatch):
+        """Test __str__ method."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        str_repr = str(controller)
+
+        assert "CLIController" in str_repr
+        assert "running=False" in str_repr
+        assert "testuser" in str_repr
+
+    def test_detailed_representation(self, monkeypatch):
+        """Test __repr__ method."""
+        controller = create_mock_cli_controller(monkeypatch)
+
+        repr_str = repr(controller)
+
+        assert "CLIController" in repr_str
+        assert "running=False" in repr_str
+        assert "handlers=3" in repr_str
+        assert "commands_processed=0" in repr_str
+
+
+class TestCreateCLIControllerFactory:
+    """Test the factory function for creating CLI controllers."""
+
+    def test_create_cli_controller_success(self, mock_agent, console, monkeypatch):
+        """Test successful CLI controller creation via factory."""
+        # Mock all dependencies
+        monkeypatch.setattr(
+            "ifw.cli.controller.SessionManager", mock_session_manager_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.CommandProcessor", mock_command_processor_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandExecutor", mock_shell_executor_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandDetector", mock_shell_detector_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ControlCommandHandler", mock_control_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandHandler", mock_shell_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.AIRequestHandler", mock_ai_handler_factory
+        )
+
+        controller = create_cli_controller(
+            agent=mock_agent, console=console, debug_mode=True
+        )
+
+        assert isinstance(controller, CLIController)
+        assert controller.agent == mock_agent
+        assert controller.console == console
+        assert controller.debug_mode is True
+
+    def test_create_cli_controller_with_defaults(self, mock_agent, monkeypatch):
+        """Test factory with default parameters."""
+        # Mock all dependencies
+        monkeypatch.setattr(
+            "ifw.cli.controller.SessionManager", mock_session_manager_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.CommandProcessor", mock_command_processor_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandExecutor", mock_shell_executor_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandDetector", mock_shell_detector_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ControlCommandHandler", mock_control_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandHandler", mock_shell_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.AIRequestHandler", mock_ai_handler_factory
+        )
+
+        controller = create_cli_controller(agent=mock_agent)
+
+        assert isinstance(controller, CLIController)
+        assert controller.agent == mock_agent
+        assert controller.debug_mode is False
+
+    def test_create_cli_controller_initialization_failure(
+        self, mock_agent, console, monkeypatch
+    ):
+        """Test factory when initialization fails."""
+
+        def failing_shell_executor():
+            raise Exception("Initialization failed")
+
+        # Mock dependencies with one failing
+        monkeypatch.setattr(
+            "ifw.cli.controller.SessionManager", mock_session_manager_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.CommandProcessor", mock_command_processor_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandExecutor", failing_shell_executor
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandDetector", mock_shell_detector_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ControlCommandHandler", mock_control_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.ShellCommandHandler", mock_shell_handler_factory
+        )
+        monkeypatch.setattr(
+            "ifw.cli.controller.AIRequestHandler", mock_ai_handler_factory
+        )
+
+        with pytest.raises(CLIInitializationError):
+            create_cli_controller(agent=mock_agent, console=console)
 
 
 if __name__ == "__main__":
-    print("Choose test mode:")
-    print("1. Run unit tests")
-    print("2. Run manual test")
-    print("3. Run both")
-
-    try:
-        choice = input("Enter choice (1-3): ").strip()
-
-        if choice in ["1", "3"]:
-            print("\n" + "=" * 60)
-            print("RUNNING UNIT TESTS")
-            print("=" * 60)
-            success = run_tests()
-
-        if choice in ["2", "3"]:
-            print("\n" + "=" * 60)
-            print("RUNNING MANUAL TEST")
-            print("=" * 60)
-            run_manual_test()
-
-    except KeyboardInterrupt:
-        print("\n🛑 Tests interrupted")
-    except Exception as e:
-        print(f"❌ Test execution failed: {e}")
+    pytest.main([__file__, "-v"])

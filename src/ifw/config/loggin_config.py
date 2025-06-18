@@ -180,19 +180,3 @@ def _configure_warnings(verbose: bool):
     warnings_logger.setLevel(logging.WARNING if not verbose else logging.DEBUG)
 
 
-if __name__ == "__main__":
-    # Original CLI usage (maintains backward compatibility)
-    import sys
-
-    verbose = "-v" in sys.argv or "--verbose" in sys.argv
-    setup_logging(verbose=verbose)  # This is how your CLI calls it
-
-    # Test the logging with color coding
-    logger = logging.getLogger(__name__)
-    logger.info("Logging system initialized")  # Blue
-    logger.debug("Debug message")  # Green
-    logger.warning("Warning message")  # Yellow
-    logger.error("Error message")  # Red
-
-    if verbose:
-        print("✓ Log file saved to ~/.ifw/logs/log_<timestamp>.txt")
