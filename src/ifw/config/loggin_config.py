@@ -4,7 +4,6 @@ Centralized logging setup with color coding and automatic file logging to ~/.ifw
 """
 
 import logging
-import logging.handlers
 import warnings
 import sys
 from pathlib import Path
