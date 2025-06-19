@@ -21,7 +21,6 @@ class AIRequestHandler(BaseHandler):
         """Execute AI request with current shell context and user identification."""
         thinking_control = None
         try:
-            # Import thinking indicator here to avoid import issues
 
             # Start thinking animation
             thinking_control = start_thinking()
