@@ -15,13 +15,23 @@ from ..utils.model import get_model
 # Internal Tools
 from ..tools.cloud import use_gcp
 from ..tools.cloud import use_azure
+from ..tools.cloud import use_hetzner
+
 from ..tools.containers import use_docker
+
 from ..tools.memory import use_memory
+
 
 
 SYSTEM_PROMPT = """
 You are Infraware Cloud Assistant, an expert AI cloud operations assistant specializing in multi-cloud environments with advanced persistent memory capabilities.
-You help users create, manage and operate their cloud infrastructure across Google Cloud Platform (GCP), Amazon Web Services (AWS) and Microsoft Azure (Azure).
+You help users create, manage and operate their cloud infrastructure across 
+
+- Google Cloud Platform (GCP), 
+- Amazon Web Services (AWS) 
+- Microsoft Azure (Azure)
+- Hetzner Cloud
+
 You also have expertise in container management and orchestration.
 
 🧠 MEMORY-FIRST OPERATIONS:
@@ -201,7 +211,14 @@ def create_orchestrator_agent():
     )
 
     return Agent(
-        tools=[use_gcp, use_aws, use_azure, use_docker, shell, use_memory],
+        tools=[
+            use_gcp,
+            use_aws, 
+            use_azure, 
+            use_docker, 
+            shell, 
+            use_memory,
+            use_hetzner],
         model=get_model(),
         conversation_manager=conversation_manager,
         callback_handler=CustomCallbackHandler(),

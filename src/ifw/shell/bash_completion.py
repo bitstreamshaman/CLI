@@ -21,6 +21,83 @@ import sys
 
 __version__ = "0.2.8"
 
+_BASH_COMPLETIONS_PATHS_DEFAULT: tuple[str, ...] = ()
+_BASH_PATTERN_NEED_QUOTES: tp.Optional[tp.Pattern] = None
+BASH_COMPLETE_SCRIPT = r"""
+{source}
+
+# Override some functions in bash-completion, do not quote for readline
+quote_readline()
+{{
+    echo "$1"
+}}
+
+_quote_readline_by_ref()
+{{
+    if [[ $1 == \'* || $1 == \"* ]]; then
+        # Leave out first character
+        printf -v $2 %s "${{1:1}}"
+    else
+        printf -v $2 %s "$1"
+    fi
+
+    [[ ${{!2}} == \$* ]] && eval $2=${{!2}}
+}}
+
+
+function _get_complete_statement {{
+    complete -p {cmd} 2> /dev/null || echo "-F _minimal"
+}}
+
+function getarg {{
+    find=$1
+    shift 1
+    prev=""
+    for i in $* ; do
+        if [ "$prev" = "$find" ] ; then
+            echo $i
+        fi
+        prev=$i
+    done
+}}
+
+_complete_stmt=$(_get_complete_statement)
+if echo "$_complete_stmt" | grep --quiet -e "_minimal"
+then
+    declare -f _completion_loader > /dev/null && _completion_loader {cmd}
+    _complete_stmt=$(_get_complete_statement)
+fi
+
+# Is -C (subshell) or -F (function) completion used?
+if [[ $_complete_stmt =~ "-C" ]] ; then
+    _func=$(eval getarg "-C" $_complete_stmt)
+else
+    _func=$(eval getarg "-F" $_complete_stmt)
+    declare -f "$_func" > /dev/null || exit 1
+fi
+
+echo "$_complete_stmt"
+export COMP_WORDS=({line})
+export COMP_LINE={comp_line}
+export COMP_POINT=${{#COMP_LINE}}
+export COMP_COUNT={end}
+export COMP_CWORD={n}
+$_func {cmd} {prefix} {prev}
+
+# print out completions, right-stripped if they contain no internal spaces
+shopt -s extglob
+for ((i=0;i<${{#COMPREPLY[*]}};i++))
+do
+    no_spaces="${{COMPREPLY[i]//[[:space:]]}}"
+    no_trailing_spaces="${{COMPREPLY[i]%%+([[:space:]])}}"
+    if [[ "$no_spaces" == "$no_trailing_spaces" ]]; then
+        echo "$no_trailing_spaces"
+    else
+        echo "${{COMPREPLY[i]}}"
+    fi
+done
+"""
+
 
 @functools.lru_cache(1)
 def _git_for_windows_path():
@@ -103,9 +180,6 @@ def _bash_completion_paths_default():
     return bcd
 
 
-_BASH_COMPLETIONS_PATHS_DEFAULT: tuple[str, ...] = ()
-
-
 def _get_bash_completions_source(paths=None):
     global _BASH_COMPLETIONS_PATHS_DEFAULT
     if paths is None:
@@ -126,9 +200,6 @@ def _bash_get_sep():
         return os.altsep
     else:
         return os.sep
-
-
-_BASH_PATTERN_NEED_QUOTES: tp.Optional[tp.Pattern] = None
 
 
 def _bash_pattern_need_quotes():
@@ -205,82 +276,6 @@ def _bash_quote_paths(paths, start, end):
             s = s.replace(end, "".join(f"\\{i}" for i in end))
         out.add(start + s + end)
     return out, need_quotes
-
-
-BASH_COMPLETE_SCRIPT = r"""
-{source}
-
-# Override some functions in bash-completion, do not quote for readline
-quote_readline()
-{{
-    echo "$1"
-}}
-
-_quote_readline_by_ref()
-{{
-    if [[ $1 == \'* || $1 == \"* ]]; then
-        # Leave out first character
-        printf -v $2 %s "${{1:1}}"
-    else
-        printf -v $2 %s "$1"
-    fi
-
-    [[ ${{!2}} == \$* ]] && eval $2=${{!2}}
-}}
-
-
-function _get_complete_statement {{
-    complete -p {cmd} 2> /dev/null || echo "-F _minimal"
-}}
-
-function getarg {{
-    find=$1
-    shift 1
-    prev=""
-    for i in $* ; do
-        if [ "$prev" = "$find" ] ; then
-            echo $i
-        fi
-        prev=$i
-    done
-}}
-
-_complete_stmt=$(_get_complete_statement)
-if echo "$_complete_stmt" | grep --quiet -e "_minimal"
-then
-    declare -f _completion_loader > /dev/null && _completion_loader {cmd}
-    _complete_stmt=$(_get_complete_statement)
-fi
-
-# Is -C (subshell) or -F (function) completion used?
-if [[ $_complete_stmt =~ "-C" ]] ; then
-    _func=$(eval getarg "-C" $_complete_stmt)
-else
-    _func=$(eval getarg "-F" $_complete_stmt)
-    declare -f "$_func" > /dev/null || exit 1
-fi
-
-echo "$_complete_stmt"
-export COMP_WORDS=({line})
-export COMP_LINE={comp_line}
-export COMP_POINT=${{#COMP_LINE}}
-export COMP_COUNT={end}
-export COMP_CWORD={n}
-$_func {cmd} {prefix} {prev}
-
-# print out completions, right-stripped if they contain no internal spaces
-shopt -s extglob
-for ((i=0;i<${{#COMPREPLY[*]}};i++))
-do
-    no_spaces="${{COMPREPLY[i]//[[:space:]]}}"
-    no_trailing_spaces="${{COMPREPLY[i]%%+([[:space:]])}}"
-    if [[ "$no_spaces" == "$no_trailing_spaces" ]]; then
-        echo "$no_trailing_spaces"
-    else
-        echo "${{COMPREPLY[i]}}"
-    fi
-done
-"""
 
 
 def bash_completions(
@@ -417,6 +412,7 @@ def bash_completions(
         strip_len = prefix.index(":") + 1
 
     return out, max(len(prefix) - strip_len, 0)
+
 
 def bash_complete_line(line, return_line=True, **kwargs):
     """Provides the completion from the end of the line.
